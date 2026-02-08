@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { BookOpen, Clock, Trash2, ChevronRight } from 'lucide-react';
+import { BookOpen, Clock, Trash2, ChevronRight, ArrowLeft } from 'lucide-react';
 import { Recipe } from '@/utils/gemini';
 
 interface CookedRecipe extends Recipe {
@@ -72,6 +72,13 @@ export default function CooklogPage() {
     <div className="min-h-screen bg-black px-5 pt-12 pb-24">
       {/* Header */}
       <header className="mb-6">
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-4"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          <span className="text-sm">Back</span>
+        </button>
         <h1 className="text-2xl font-semibold text-white mb-2">My Cooklog</h1>
         <p className="text-gray-500 text-sm">
           A collection of dishes you've cooked, organized by day.

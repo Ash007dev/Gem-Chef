@@ -169,10 +169,16 @@ export async function generateRecipes(
         Context:
         - Available ingredients: ${ingredients.join(', ')}
         - Meal time: ${meal}
-        - Dietary preference: ${dietary === 'Veg' ? 'Vegetarian only' : dietary === 'Non-Veg' ? 'Non-vegetarian preferred' : 'No restriction'}
+        - Dietary preference: ${dietary === 'Veg' ? 'STRICTLY VEGETARIAN ONLY - absolutely NO meat, chicken, fish, seafood, eggs, or any non-vegetarian ingredient whatsoever. Only pure vegetarian dishes using vegetables, grains, legumes, dairy (milk, cheese, paneer, butter, ghee, curd/yogurt), nuts, and plant-based ingredients.' : dietary === 'Non-Veg' ? 'Non-vegetarian preferred (meat, chicken, fish, seafood, eggs allowed)' : 'No restriction (both vegetarian and non-vegetarian OK)'}
         - Cooking style: ${style} - ${styleHints[style] || 'Balanced approach'}
         ${effectiveCuisine ? `- Cuisine/Region: ${effectiveCuisine}` : ''}
         
+        ${dietary === 'Veg' ? `*** EXTREMELY IMPORTANT DIETARY CONSTRAINT ***
+        The user is VEGETARIAN. Every single one of the 9 recipes MUST be 100% vegetarian.
+        Do NOT include ANY of these: meat, chicken, mutton, lamb, pork, beef, fish, shrimp, prawn, crab, lobster, squid, eggs, gelatin, or any animal-derived ingredients (dairy like milk, paneer, cheese, butter, ghee, yogurt IS allowed).
+        If a regional dish is traditionally non-vegetarian, replace it with a famous VEGETARIAN dish from that region instead.
+        Double-check every recipe and every ingredient to ensure strict vegetarian compliance.
+        ` : ''}
         GENERATE 9 RECIPES TOTAL:
         
         FIRST 3 - REGIONAL SIGNATURE DISHES (isRegional: true):

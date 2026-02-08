@@ -2,22 +2,17 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Utensils, BookOpen, Settings } from 'lucide-react';
+import { Home, Camera, BookOpen, Settings } from 'lucide-react';
 
 const navItems = [
-    { href: '/', label: 'Today', icon: Utensils },
+    { href: '/home', label: 'Home', icon: Home },
+    { href: '/', label: 'Scan', icon: Camera },
     { href: '/cooklog', label: 'Cooklog', icon: BookOpen },
-    { href: '/preferences', label: 'Preferences', icon: Settings },
+    { href: '/preferences', label: 'Settings', icon: Settings },
 ];
 
 export default function BottomNav() {
     const pathname = usePathname();
-
-    // Hide nav on cooking/recipe detail pages
-    const hiddenPaths = ['/cook', '/recipe/'];
-    const shouldHide = hiddenPaths.some(path => pathname.startsWith(path));
-
-    if (shouldHide) return null;
 
     return (
         <nav className="fixed bottom-0 left-0 right-0 z-40 bg-black border-t border-dark-border pb-safe">
