@@ -1,0 +1,378 @@
+import { GoogleGenerativeAI } from '@google/generative-ai';
+
+// Initialize Gemini Client
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+
+// Priority ordered Gemini models (fallback order)
+const MODEL_PRIORITY: string[] = [
+    'gemini-2.0-flash',
+    'gemini-1.5-flash'
+];
+
+// Helper to try models in sequence
+async function generateWithFallback<T>(
+    operation: (modelName: string) => Promise<T>,
+    context: string
+): Promise<T> {
+    let lastError: unknown;
+
+    for (const modelName of MODEL_PRIORITY) {
+        try {
+            console.log(`Trying model: ${modelName} for ${context}`);
+            const result = await operation(modelName);
+            return result;
+        } catch (error) {
+            console.warn(`Model ${modelName} failed for ${context}:`, error);
+            lastError = error;
+            // Continue to next model
+        }
+    }
+
+    throw lastError || new Error(`All models failed for ${context}`);
+}
+
+// System instruction for food scanning
+const SYSTEM_INSTRUCTION = `You are a food scanner. Your job is to identify edible ingredients visible in the image.
+Rules:
+- Only identify food items and cooking ingredients
+- Ignore non-food items like plates, utensils, packaging
+- Be specific (e.g., "red bell pepper" instead of just "pepper")
+- Return ONLY raw JSON in this exact format: { "ingredients": ["item1", "item2", ...] }
+- If no food is visible, return: { "ingredients": [] }`;
+
+export interface IngredientResponse {
+    ingredients: string[];
+}
+
+/**
+ * Identifies food ingredients in an image using Gemini Vision with fallback
+ */
+export async function identifyIngredients(
+    imageBase64: string,
+    mimeType: string = 'image/jpeg'
+): Promise<IngredientResponse> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            systemInstruction: SYSTEM_INSTRUCTION,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = "Identify all ingredients in this image. Return valid JSON.";
+        const imagePart = {
+            inlineData: {
+                data: imageBase64,
+                mimeType
+            }
+        };
+
+        const result = await model.generateContent([prompt, imagePart]);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            return JSON.parse(text) as IngredientResponse;
+        } catch (e) {
+            console.error("Failed to parse JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'identifyIngredients');
+}
+
+/**
+ * Helper to convert File to Base64
+ */
+export const fileToBase64 = (file: File): Promise<{ base64: string; mimeType: string }> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => {
+            const result = reader.result as string;
+            // Remove data:image/jpeg;base64, prefix
+            const base64 = result.split(',')[1];
+            const mimeType = result.match(/:(.*?);/)?.[1] || 'image/jpeg';
+            resolve({ base64, mimeType });
+        };
+        reader.onerror = error => reject(error);
+    });
+};
+
+export interface Recipe {
+    id: string;
+    title: string;
+    description: string;
+    prepTime: string;
+    cookTime: string;
+    totalTime: string;
+    servings: string;
+    difficulty: 'Easy' | 'Medium' | 'Hard';
+    calories: string;
+    type: 'quick' | 'traditional' | 'healthy' | 'comfort' | 'fusion' | 'simple' | 'regional';
+    isRegional?: boolean;
+    pairingsuggestion?: string;
+    ingredients: {
+        provided: string[];
+        shoppingList: string[];
+    };
+    steps: string[];
+    mealPrep: string[];
+}
+
+/**
+ * Generates recipes based on ingredients, context, style and preferences with fallback
+ * Returns 3 regional signature dishes + 6 regular recipes
+ */
+export async function generateRecipes(
+    ingredients: string[],
+    context: {
+        meal?: string;
+        dietary?: string;
+        location?: string;
+        style?: string;
+        cuisine?: string;
+    } = {}
+): Promise<Recipe[]> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: {
+                responseMimeType: "application/json",
+                temperature: 0.8
+            }
+        });
+
+        const {
+            meal = 'any',
+            dietary = 'both',
+            location = '',
+            style = 'Quick & Easy',
+            cuisine = 'Same as Location'
+        } = context;
+
+        // Determine the cuisine to use
+        const effectiveCuisine = cuisine === 'Same as Location' ? location : cuisine;
+
+        // Map cooking style to recipe generation hints
+        const styleHints: Record<string, string> = {
+            'Quick & Easy': 'Focus on recipes under 30 minutes with minimal prep',
+            'Restaurant Style': 'Chef-level techniques, restaurant presentation, gourmet flavors',
+            'Healthy': 'Low calorie, nutritious, balanced meals with health benefits',
+            'Comfort Food': 'Hearty, homestyle, soul-warming dishes'
+        };
+
+        const prompt = `
+        You are a professional chef creating recipes for COMPLETE BEGINNERS who have never cooked before.
+        
+        Context:
+        - Available ingredients: ${ingredients.join(', ')}
+        - Meal time: ${meal}
+        - Dietary preference: ${dietary === 'Veg' ? 'Vegetarian only' : dietary === 'Non-Veg' ? 'Non-vegetarian preferred' : 'No restriction'}
+        - Cooking style: ${style} - ${styleHints[style] || 'Balanced approach'}
+        ${effectiveCuisine ? `- Cuisine/Region: ${effectiveCuisine}` : ''}
+        
+        GENERATE 9 RECIPES TOTAL:
+        
+        FIRST 3 - REGIONAL SIGNATURE DISHES (isRegional: true):
+        ${effectiveCuisine ? `Top 3 must-try dishes from ${effectiveCuisine} cuisine. These are iconic, signature dishes of the region.` : 'Top 3 popular dishes from the user\'s region.'}
+        
+        NEXT 6 - REGULAR RECIPES based on "${style}" style:
+        ${style === 'Quick & Easy' ?
+                '4. Super Quick (15 min), 5. Easy Weeknight, 6. No-Cook/Minimal, 7. One-Pan, 8. 5-Ingredient, 9. Microwave-Friendly' :
+                style === 'Restaurant Style' ?
+                    '4. Fine Dining, 5. Professional Plating, 6. Complex Flavors, 7. Gourmet Fusion, 8. Chef\'s Special, 9. Signature Dish' :
+                    style === 'Healthy' ?
+                        '4. Low-Carb, 5. High-Protein, 6. Superfood Bowl, 7. Clean Eating, 8. Meal Prep Friendly, 9. Light & Fresh' :
+                        '4. Nostalgic Home Cooking, 5. Hearty One-Pot, 6. Creamy & Rich, 7. Fried Favorites, 8. Slow-Cooked, 9. Family Recipe Style'
+            }
+
+        CRITICAL REQUIREMENTS FOR BEGINNER-FRIENDLY RECIPES:
+        
+        1. STEPS MUST BE EXTREMELY DETAILED - Write as if teaching someone who has NEVER cooked before:
+           - Specify exact temperatures (low/medium/high heat, or degrees)
+           - Include visual and sensory cues: "until golden brown", "when it starts to bubble", "until fragrant about 30 seconds"
+           - Explain techniques: "Sauté means to cook quickly in a small amount of oil while stirring"
+           - Include timing for EVERY action: "Stir for 2 minutes", "Let it rest for 5 minutes"
+           - Warn about common mistakes: "Don't overcrowd the pan or it will steam instead of fry"
+           - Each step should be 2-3 sentences minimum with clear instructions
+        
+        2. PAIRING SUGGESTIONS - For each dish, suggest what to serve it with:
+           - If it's a curry → suggest rice, bread, or accompaniments (e.g., "Best served with: Steamed basmati rice or Idiyappam/Appam")
+           - If it's a bread/rice dish → suggest curries or sides (e.g., "Best served with: Kerala-style egg curry or vegetable stew")
+           - If it's a standalone dish → suggest complementary sides
+           - Make pairings culturally appropriate to the cuisine
+        
+        3. INGREDIENTS should have EXACT quantities with alternatives:
+           - "2 medium onions (about 200g), finely diced"
+           - "1 cup rice (200g) - Basmati or any long-grain rice works"
+
+        Return JSON array with this exact schema:
+        [
+          {
+            "id": "unique-id",
+            "title": "Recipe Name",
+            "description": "One line appetizing description",
+            "prepTime": "e.g. 15 min",
+            "cookTime": "e.g. 25 min",
+            "totalTime": "e.g. 40 min",
+            "servings": "e.g. 2-3 servings",
+            "difficulty": "Easy" | "Medium" | "Hard",
+            "calories": "e.g. 350 kcal per serving",
+            "type": "regional" | "quick" | "traditional" | "healthy" | "comfort" | "fusion" | "simple",
+            "isRegional": true or false (true for first 3 only),
+            "pairingsuggestion": "Best served with: Steamed rice and Kerala-style sambar",
+            "ingredients": {
+              "provided": ["2 medium tomatoes (150g), roughly chopped"],
+              "shoppingList": ["1 cup coconut milk (240ml) - canned works great"]
+            },
+            "steps": [
+              "Step 1: Prepare your ingredients (mise en place). Wash and chop all vegetables before starting. This makes cooking smoother and prevents burning while you're busy cutting.",
+              "Step 2: Heat a large pan or kadai over MEDIUM heat for 1 minute until hot. Add 2 tablespoons of oil and wait 30 seconds until the oil shimmers (ripples when you tilt the pan).",
+              "Step 3: Add the mustard seeds. They will start to pop and splutter within 10-15 seconds. Cover with a lid to prevent splattering. Once the popping slows down, proceed to the next step.",
+              "...continue with equally detailed steps..."
+            ],
+            "mealPrep": ["Can be stored in refrigerator for 3 days", "Reheat in microwave for 2 minutes"]
+          }
+        ]
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            const recipes = JSON.parse(text);
+            if (!Array.isArray(recipes) || recipes.length === 0) {
+                throw new Error("Invalid recipe format");
+            }
+            return recipes as Recipe[];
+        } catch (e) {
+            console.error("Failed to parse recipes JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'generateRecipes');
+}
+
+export interface StepVerificationResult {
+    status: 'pass' | 'fail';
+    feedback: string;
+    spokenTip: string;
+    timeRemaining?: string;
+}
+
+/**
+ * Verifies cooking step using vision with fallback
+ * Returns detailed feedback including spoken tips
+ */
+export async function verifyCookingStep(
+    currentStep: string,
+    recipeTitle: string,
+    imageBase64: string,
+    mimeType: string = 'image/jpeg'
+): Promise<StepVerificationResult> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `
+        You are a friendly cooking assistant helping someone cook ${recipeTitle}.
+        Current step: "${currentStep}"
+        
+        Analyze this photo of their cooking progress and provide helpful feedback.
+        
+        Be encouraging and specific. If they need to wait, estimate the time.
+        The "spokenTip" should be natural speech that will be read aloud.
+        
+        Return JSON:
+        {
+            "status": "pass" or "fail",
+            "feedback": "Brief written feedback",
+            "spokenTip": "Natural spoken advice like: Looking great! Let it cook for about 2 more minutes until golden brown.",
+            "timeRemaining": "optional - e.g. '2 minutes' if they need to wait"
+        }
+        `;
+
+        const imagePart = {
+            inlineData: {
+                data: imageBase64,
+                mimeType
+            }
+        };
+
+        const result = await model.generateContent([prompt, imagePart]);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            return JSON.parse(text) as StepVerificationResult;
+        } catch (e) {
+            console.error("Failed to parse verification JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'verifyCookingStep');
+}
+
+export interface CookingTip {
+    tip: string;
+    action: 'wait' | 'adjust' | 'continue' | 'done';
+    timeEstimate?: string;
+}
+
+/**
+ * Gets real-time cooking advice based on photo
+ * Returns natural language tips meant to be spoken aloud
+ */
+export async function getCookingTip(
+    recipeTitle: string,
+    currentStep: string,
+    imageBase64: string,
+    mimeType: string = 'image/jpeg'
+): Promise<CookingTip> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `
+        You are a real-time cooking assistant. The user is cooking ${recipeTitle}.
+        They are on this step: "${currentStep}"
+        
+        Look at this photo and give them ONE short, helpful tip.
+        Speak naturally like a friend helping in the kitchen.
+        
+        Examples of good tips:
+        - "That looks perfect! Move on to the next step."
+        - "Give it about 2 more minutes, it's almost there."
+        - "Turn the heat down a bit, it's getting too brown."
+        - "Add a pinch more salt, it needs seasoning."
+        
+        Return JSON:
+        {
+            "tip": "Your natural spoken tip (1-2 sentences max)",
+            "action": "wait" | "adjust" | "continue" | "done",
+            "timeEstimate": "optional - e.g. '2 minutes'"
+        }
+        `;
+
+        const imagePart = {
+            inlineData: {
+                data: imageBase64,
+                mimeType
+            }
+        };
+
+        const result = await model.generateContent([prompt, imagePart]);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            return JSON.parse(text) as CookingTip;
+        } catch (e) {
+            console.error("Failed to parse tip JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'getCookingTip');
+}
+
