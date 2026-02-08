@@ -6,6 +6,9 @@ export const metadata: Metadata = {
     title: 'SmartChef',
     description: 'AI-powered cooking assistant',
     manifest: '/manifest.json',
+    icons: {
+        icon: '/favicon.svg',
+    },
 };
 
 export const viewport: Viewport = {
