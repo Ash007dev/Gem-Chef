@@ -8,7 +8,9 @@ import { NextRequest, NextResponse } from 'next/server';
  * See: https://ai.google.dev/gemini-api/docs/ephemeral-tokens
  */
 export async function GET(request: NextRequest) {
-    const apiKey = process.env.GEMINI_API_KEY;
+    // Support multiple API keys — pick the current active one
+    const keys = process.env.GEMINI_API_KEYS?.split(',').map(k => k.trim()).filter(Boolean) || [];
+    const apiKey = keys.length > 0 ? keys[0] : process.env.GEMINI_API_KEY;
 
     if (!apiKey) {
         return NextResponse.json(
@@ -26,6 +28,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
         apiKey: apiKey,
         model: 'gemini-2.0-flash-live-001',
+        models: [
+            'gemini-2.5-flash-native-audio-preview-12-2025',
+            'gemini-2.0-flash-live-001',
+            'gemini-2.0-flash',
+        ],
         expiresAt: Date.now() + 3600000 // 1 hour from now
     });
 }

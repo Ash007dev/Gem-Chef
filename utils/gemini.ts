@@ -1,34 +1,130 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Initialize Gemini Client
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+// Support multiple API keys for automatic rotation when quota is exhausted
+// Set GEMINI_API_KEYS as comma-separated keys, or fall back to single GEMINI_API_KEY
+const API_KEYS: string[] = (
+    process.env.GEMINI_API_KEYS?.split(',').map(k => k.trim()).filter(Boolean) ||
+    [process.env.GEMINI_API_KEY || '']
+).filter(k => k.length > 0);
 
-// Priority ordered Gemini models (fallback order)
+// Track which API key is currently active
+let currentKeyIndex = 0;
+
+// Create a new client for a given key index
+function getClient(keyIndex: number): GoogleGenerativeAI {
+    return new GoogleGenerativeAI(API_KEYS[keyIndex % API_KEYS.length]);
+}
+
+// Initialize with first key
+let genAI = getClient(0);
+
+// Rotate to the next API key
+function rotateApiKey(): boolean {
+    if (API_KEYS.length <= 1) return false;
+    const prevIndex = currentKeyIndex;
+    currentKeyIndex = (currentKeyIndex + 1) % API_KEYS.length;
+    // If we've cycled back to the start, all keys are exhausted
+    if (currentKeyIndex === 0 && prevIndex !== 0) {
+        console.warn('[GemChef] All API keys exhausted, cycling back to first');
+    }
+    genAI = getClient(currentKeyIndex);
+    console.log(`[GemChef] Rotated to API key #${currentKeyIndex + 1} of ${API_KEYS.length}`);
+    return true;
+}
+
+// Priority ordered Gemini models — extensive fallback chain
+// If one model hits rate/quota limits, the next is tried silently
 const MODEL_PRIORITY: string[] = [
     'gemini-2.0-flash',
-    'gemini-2.0-flash-lite'
+    'gemini-2.0-flash-lite',
+    'gemini-1.5-flash',
+    'gemini-1.5-flash-8b',
+    'gemini-1.5-pro',
+    'gemini-2.0-flash-thinking-exp',
+    'gemini-1.5-flash-002',
+    'gemini-1.5-flash-001',
 ];
 
-// Helper to try models in sequence
+// Track which model last succeeded so we start there next time
+let lastWorkingModelIndex = 0;
+
+// Detect if an error is a rate-limit / quota / unavailability issue
+function isRetryableError(error: unknown): boolean {
+    const msg = String(error).toLowerCase();
+    return (
+        msg.includes('429') ||
+        msg.includes('rate') ||
+        msg.includes('quota') ||
+        msg.includes('resource_exhausted') ||
+        msg.includes('resource has been exhausted') ||
+        msg.includes('limit') ||
+        msg.includes('overloaded') ||
+        msg.includes('unavailable') ||
+        msg.includes('503') ||
+        msg.includes('500') ||
+        msg.includes('internal') ||
+        msg.includes('capacity') ||
+        msg.includes('too many requests') ||
+        msg.includes('try again') ||
+        msg.includes('not found') ||
+        msg.includes('404') ||
+        msg.includes('deprecated') ||
+        msg.includes('permission') ||
+        msg.includes('billing')
+    );
+}
+
+// Helper to try models in sequence with API key rotation — completely silent
 async function generateWithFallback<T>(
     operation: (modelName: string) => Promise<T>,
     context: string
 ): Promise<T> {
     let lastError: unknown;
+    const totalKeys = API_KEYS.length;
+    let keysTriedCount = 0;
+    const startKeyIndex = currentKeyIndex;
 
-    for (const modelName of MODEL_PRIORITY) {
-        try {
-            console.log(`Trying model: ${modelName} for ${context}`);
-            const result = await operation(modelName);
-            return result;
-        } catch (error) {
-            console.warn(`Model ${modelName} failed for ${context}:`, error);
-            lastError = error;
-            // Continue to next model
+    // Outer loop: try each API key
+    while (keysTriedCount < totalKeys) {
+        // Build an ordered list starting from the last working model
+        const orderedModels = [
+            ...MODEL_PRIORITY.slice(lastWorkingModelIndex),
+            ...MODEL_PRIORITY.slice(0, lastWorkingModelIndex),
+        ];
+
+        let allModelsFailedWithQuota = true;
+
+        for (let i = 0; i < orderedModels.length; i++) {
+            const modelName = orderedModels[i];
+            try {
+                console.log(`[GemChef] Key #${currentKeyIndex + 1} → ${modelName} for ${context}`);
+                const result = await operation(modelName);
+                lastWorkingModelIndex = MODEL_PRIORITY.indexOf(modelName);
+                console.log(`[GemChef] ✓ ${modelName} succeeded for ${context}`);
+                return result;
+            } catch (error) {
+                console.warn(`[GemChef] ✗ ${modelName} failed for ${context}:`, error);
+                lastError = error;
+
+                // If this is a quota/rate error, all models on this key will fail
+                if (isRetryableError(error)) {
+                    // Skip remaining models on this key, rotate to next key
+                    break;
+                }
+                // For non-quota errors (bad JSON, etc.), try next model on same key
+                allModelsFailedWithQuota = false;
+            }
+        }
+
+        // Try rotating to a different API key
+        keysTriedCount++;
+        if (keysTriedCount < totalKeys) {
+            rotateApiKey();
         }
     }
 
-    throw lastError || new Error(`All models failed for ${context}`);
+    // If every key + model combo failed, throw the last error
+    throw lastError || new Error(`All API keys and models failed for ${context}`);
 }
 
 // System instruction for food scanning
@@ -130,6 +226,7 @@ export async function generateRecipes(
         location?: string;
         style?: string;
         cuisine?: string;
+        ageGroup?: string;
     } = {}
 ): Promise<Recipe[]> {
     return generateWithFallback(async (modelName) => {
@@ -146,7 +243,8 @@ export async function generateRecipes(
             dietary = 'both',
             location = '',
             style = 'Quick & Easy',
-            cuisine = 'Same as Location'
+            cuisine = 'Same as Location',
+            ageGroup = 'Adult (20-59)'
         } = context;
 
         // Determine the cuisine to use
@@ -160,6 +258,115 @@ export async function generateRecipes(
             'Comfort Food': 'Hearty, homestyle, soul-warming dishes'
         };
 
+        // Build age-specific prompt block
+        let ageConstraint = '';
+        let ageRecipeOverride = ''; // Override recipe categories for very young children
+
+        if (ageGroup.includes('Baby')) {
+            ageConstraint = `
+        *** CRITICAL: COOKING FOR A BABY (0-2 YEARS OLD) ***
+        ALL 9 recipes MUST be age-appropriate baby food. This is non-negotiable.
+        ONLY generate these types of baby-safe foods:
+        - Porridges (rice porridge, oat porridge, ragi porridge, dal porridge)
+        - Purees (fruit puree, vegetable puree, mixed puree)
+        - Mashed foods (mashed banana, mashed potato, mashed avocado, mashed dal-rice)
+        - Soft khichdi (rice + lentil cooked very soft with mild spices)
+        - Soups (strained, smooth vegetable or lentil soups)
+        - Cerelac-style homemade cereal mixes
+        - Soft idli, soft dosa pieces soaked in mild rasam
+        
+        ABSOLUTELY FORBIDDEN for babies:
+        - NO salt (babies under 1 year) or very minimal salt (1-2 years)
+        - NO honey (toxic for babies under 1)
+        - NO sugar or jaggery for babies under 1
+        - NO whole nuts, seeds, or chunks (choking hazard)
+        - NO spicy food, chili, pepper
+        - NO raw vegetables or hard fruits
+        - NO cow's milk as main drink (under 1 year)
+        - NO fried food
+        - NO stews, curries, or adult dishes - even "mild" ones
+        
+        Every recipe must specify the exact age range it's suitable for (e.g., "6+ months", "8+ months", "12+ months").
+        Texture must be explicitly stated: "smooth puree", "mashed with small soft lumps", "soft finger food".
+        `;
+            ageRecipeOverride = `
+        GENERATE 9 BABY FOOD RECIPES (ignore the style/regional categories above):
+        1. Simple Grain Porridge (rice/oat/ragi)
+        2. Fruit Puree (banana/apple/pear)
+        3. Vegetable Puree (carrot/sweet potato/pumpkin)
+        4. Dal + Rice Mash (soft khichdi)
+        5. Mixed Fruit & Veggie Puree
+        6. Protein-Rich Baby Food (lentil/moong dal based)
+        7. Cereal Mix / Sathu Maavu style porridge
+        8. Soft Finger Foods (for 10+ months)
+        9. Soup / Strained Broth
+
+        Mark the first 3 as isRegional: true (use regional baby food traditions from ${effectiveCuisine || 'the user\'s region'}).
+        `;
+        } else if (ageGroup.includes('Toddler')) {
+            ageConstraint = `
+        *** CRITICAL: COOKING FOR A TODDLER (2-5 YEARS OLD) ***
+        ALL 9 recipes must be toddler-appropriate. This is non-negotiable.
+        ONLY generate these types of toddler-safe foods:
+        - Soft porridges and upma
+        - Mini idlis, soft dosa, soft chapati pieces
+        - Soft rice with mild dal/sambar
+        - Mashed/soft vegetables (not raw)
+        - Mild pasta, soft noodles cut small
+        - Pancakes, soft uttapam
+        - Soft fruit bowls, smoothies
+        - Mild soups with soft vegetables
+        - Soft sandwiches, soft parathas
+        - Kheer, payasam (mild, not too sweet)
+        
+        FORBIDDEN for toddlers:
+        - NO whole nuts, whole grapes, popcorn, hard candy (choking hazards)
+        - NO very spicy food (minimal mild spices only - turmeric, cumin are OK)
+        - NO fried or deep-fried foods
+        - NO raw vegetables or hard chunks
+        - NO caffeine or carbonated drinks
+        - NO heavy/rich restaurant-style food
+        
+        All food must be in small, bite-sized, soft pieces.
+        Keep flavors mild and appealing to young children.
+        `;
+            ageRecipeOverride = `
+        GENERATE 9 TODDLER-FRIENDLY RECIPES (adapt categories to be toddler-safe):
+        1. Soft Porridge / Cereal (regional style)
+        2. Mild Rice + Dal Combo
+        3. Soft Regional Snack (mini idli, soft dosa, etc.)
+        4. Veggie Mash or Soft Veggie Dish
+        5. Toddler-Friendly Pasta/Noodles (soft, small pieces)
+        6. Soft Pancake / Uttapam
+        7. Mild Soup with Soft Veggies
+        8. Healthy Smoothie / Fruit Bowl
+        9. Soft Finger Food Platter
+
+        Mark the first 3 as isRegional: true (use regional toddler foods from ${effectiveCuisine || 'the user\'s region'}).
+        `;
+        } else if (ageGroup.includes('Kid')) {
+            ageConstraint = `
+        - Cooking for children aged 5-12. Make recipes FUN, colorful, and appealing to kids.
+        - Use mild spice levels. Include fun names and presentation ideas.
+        - Ensure nutritious but tasty - hide vegetables creatively if needed.
+        - Avoid very spicy, bitter, or complex flavors kids typically dislike.
+        `;
+        } else if (ageGroup.includes('Teen')) {
+            ageConstraint = `
+        - Cooking for teenagers (13-19). High-energy, protein-rich meals for growing bodies.
+        - Can include moderate spice. Make recipes trendy and appealing (think wraps, bowls, loaded items).
+        - Include quick snack options teens can make themselves.
+        `;
+        } else if (ageGroup.includes('Senior')) {
+            ageConstraint = `
+        - Cooking for seniors (60+). Easy-to-digest, soft-textured, low-sodium, low-oil meals.
+        - Heart-healthy and gentle on the stomach. Avoid very spicy, deep-fried, or heavy foods.
+        - Prefer steamed, boiled, lightly sautéed preparations. Include fiber and calcium-rich options.
+        `;
+        } else {
+            ageConstraint = '- Standard adult portions and spice levels.';
+        }
+
         const prompt = `
         You are a professional chef creating recipes for COMPLETE BEGINNERS who have never cooked before.
         
@@ -168,6 +375,8 @@ export async function generateRecipes(
         - Meal time: ${meal}
         - Dietary preference: ${dietary === 'Veg' ? 'STRICTLY VEGETARIAN ONLY - absolutely NO meat, chicken, fish, seafood, eggs, or any non-vegetarian ingredient whatsoever. Only pure vegetarian dishes using vegetables, grains, legumes, dairy (milk, cheese, paneer, butter, ghee, curd/yogurt), nuts, and plant-based ingredients.' : dietary === 'Non-Veg' ? 'Non-vegetarian preferred (meat, chicken, fish, seafood, eggs allowed)' : 'No restriction (both vegetarian and non-vegetarian OK)'}
         - Cooking style: ${style} - ${styleHints[style] || 'Balanced approach'}
+        - Cooking for age group: ${ageGroup}
+        ${ageConstraint}
         ${effectiveCuisine ? `- Cuisine/Region: ${effectiveCuisine}` : ''}
         
         ${dietary === 'Veg' ? `*** EXTREMELY IMPORTANT DIETARY CONSTRAINT ***
@@ -176,7 +385,8 @@ export async function generateRecipes(
         If a regional dish is traditionally non-vegetarian, replace it with a famous VEGETARIAN dish from that region instead.
         Double-check every recipe and every ingredient to ensure strict vegetarian compliance.
         ` : ''}
-        GENERATE 9 RECIPES TOTAL:
+
+        ${ageRecipeOverride ? ageRecipeOverride : `GENERATE 9 RECIPES TOTAL:
         
         FIRST 3 - REGIONAL SIGNATURE DISHES (isRegional: true):
         ${effectiveCuisine ? `Top 3 must-try dishes from ${effectiveCuisine} cuisine. These are iconic, signature dishes of the region.` : 'Top 3 popular dishes from the user\'s region.'}
@@ -190,6 +400,7 @@ export async function generateRecipes(
                         '4. Low-Carb, 5. High-Protein, 6. Superfood Bowl, 7. Clean Eating, 8. Meal Prep Friendly, 9. Light & Fresh' :
                         '4. Nostalgic Home Cooking, 5. Hearty One-Pot, 6. Creamy & Rich, 7. Fried Favorites, 8. Slow-Cooked, 9. Family Recipe Style'
             }
+        `}
 
         CRITICAL REQUIREMENTS FOR BEGINNER-FRIENDLY RECIPES:
         

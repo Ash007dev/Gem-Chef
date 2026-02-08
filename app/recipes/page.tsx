@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import {
     ChevronDown,
@@ -24,6 +24,7 @@ function RecipesContent() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [expandedId, setExpandedId] = useState<string | null>(null);
+    const hasFetched = useRef(false);
 
     // Get params
     const ingredients = searchParams.get('ingredients')?.split(',') || [];
@@ -32,6 +33,10 @@ function RecipesContent() {
     const location = searchParams.get('location') || '';
     const style = searchParams.get('style') || 'Quick & Easy';
     const cuisine = searchParams.get('cuisine') || 'Same as Location';
+    const ageGroup = searchParams.get('ageGroup') || 'Adult (20-59)';
+
+    // Build a full cache key from all params to detect changes
+    const cacheKey = [ingredients.join(','), meal, dietary, location, style, cuisine, ageGroup].join('|');
 
     const fetchRecipes = async () => {
         if (ingredients.length === 0) {
@@ -44,11 +49,11 @@ function RecipesContent() {
         setError('');
 
         try {
-            const result = await generateRecipes(ingredients, { meal, dietary, location, style, cuisine });
+            const result = await generateRecipes(ingredients, { meal, dietary, location, style, cuisine, ageGroup });
             setRecipes(result);
             // Cache recipes so back navigation doesn't regenerate
             sessionStorage.setItem('cachedRecipes', JSON.stringify(result));
-            sessionStorage.setItem('cachedRecipesKey', ingredients.join(','));
+            sessionStorage.setItem('cachedRecipesKey', cacheKey);
             // Auto-expand first recipe
             if (result.length > 0) {
                 setExpandedId(result[0].id);
@@ -62,10 +67,14 @@ function RecipesContent() {
     };
 
     useEffect(() => {
-        // Check if we have cached recipes for the same ingredients
+        // Prevent double-fetch from React strict mode or re-renders
+        if (hasFetched.current) return;
+        hasFetched.current = true;
+
+        // Check if we have cached recipes for the same params
         const cachedKey = sessionStorage.getItem('cachedRecipesKey');
         const cached = sessionStorage.getItem('cachedRecipes');
-        if (cached && cachedKey === ingredients.join(',')) {
+        if (cached && cachedKey === cacheKey) {
             const parsed = JSON.parse(cached) as Recipe[];
             setRecipes(parsed);
             if (parsed.length > 0) {
@@ -81,6 +90,7 @@ function RecipesContent() {
         // Clear cache so new recipes are generated
         sessionStorage.removeItem('cachedRecipes');
         sessionStorage.removeItem('cachedRecipesKey');
+        hasFetched.current = false;
         fetchRecipes();
     };
 

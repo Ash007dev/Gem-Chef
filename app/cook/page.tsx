@@ -227,9 +227,58 @@ function CookContent() {
     const [voiceEnabled, setVoiceEnabled] = useState(true);
     const [isVerifying, setIsVerifying] = useState(false);
     const [showLiveMode, setShowLiveMode] = useState(false);
+    const [voicesLoaded, setVoicesLoaded] = useState(false);
 
     const [successToast, setSuccessToast] = useState('');
     const [failureModal, setFailureModal] = useState<string | null>(null);
+
+    // Ensure voices are loaded (they load asynchronously in some browsers)
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const loadVoices = () => {
+            const voices = window.speechSynthesis.getVoices();
+            if (voices.length > 0) setVoicesLoaded(true);
+        };
+        loadVoices();
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+    }, []);
+
+    // Stop all speech when leaving the page — multiple strategies for reliability
+    useEffect(() => {
+        const stopSpeech = () => {
+            window.speechSynthesis.cancel();
+        };
+
+        // Handle browser back/forward
+        window.addEventListener('beforeunload', stopSpeech);
+        window.addEventListener('pagehide', stopSpeech);
+        window.addEventListener('popstate', stopSpeech);
+
+        // Handle visibility change (tab switch, app switch)
+        const handleVisibility = () => {
+            if (document.hidden) {
+                // Don't stop on tab switch — only stop on actual navigation
+            }
+        };
+
+        // Intercept link clicks to stop speech before Next.js navigation
+        const handleClick = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            const anchor = target.closest('a');
+            if (anchor && anchor.href) {
+                stopSpeech();
+            }
+        };
+        document.addEventListener('click', handleClick, true);
+
+        return () => {
+            stopSpeech();
+            window.removeEventListener('beforeunload', stopSpeech);
+            window.removeEventListener('pagehide', stopSpeech);
+            window.removeEventListener('popstate', stopSpeech);
+            document.removeEventListener('click', handleClick, true);
+        };
+    }, []);
 
     // Load recipe from sessionStorage
     useEffect(() => {
@@ -241,6 +290,22 @@ function CookContent() {
         }
     }, [router]);
 
+    // Get a female voice
+    const getFemaleVoice = (): SpeechSynthesisVoice | null => {
+        const voices = window.speechSynthesis.getVoices();
+        // Prefer specific high-quality female voices
+        const preferred = ['Samantha', 'Karen', 'Victoria', 'Zira', 'Google UK English Female', 'Google US English', 'Fiona', 'Moira', 'Tessa'];
+        for (const name of preferred) {
+            const match = voices.find(v => v.name.includes(name));
+            if (match) return match;
+        }
+        // Fallback: find any female-sounding voice
+        const female = voices.find(v => /female|woman/i.test(v.name));
+        if (female) return female;
+        // Last resort: pick first English voice
+        return voices.find(v => v.lang.startsWith('en')) || null;
+    };
+
     // Speak current step
     const speakStep = (text: string) => {
         if (!voiceEnabled || typeof window === 'undefined') return;
@@ -248,6 +313,9 @@ function CookContent() {
         window.speechSynthesis.cancel();
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.rate = 0.9;
+        const femaleVoice = getFemaleVoice();
+        if (femaleVoice) utterance.voice = femaleVoice;
+        utterance.pitch = 1.1;
         utterance.onstart = () => setIsSpeaking(true);
         utterance.onend = () => setIsSpeaking(false);
         window.speechSynthesis.speak(utterance);
@@ -339,7 +407,7 @@ function CookContent() {
         return (
             <div>
                 <header className="fixed top-0 left-0 right-0 z-30 bg-black px-5 py-4">
-                    <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-400">
+                    <button onClick={() => { window.speechSynthesis.cancel(); router.back(); }} className="flex items-center gap-2 text-gray-400">
                         <ArrowLeft className="w-5 h-5" />
                         <span>Back</span>
                     </button>
@@ -352,7 +420,7 @@ function CookContent() {
     }
 
     if (phase === 'complete') {
-        return <CompletionModal recipe={recipe} onFinish={() => router.push('/cooklog')} />;
+        return <CompletionModal recipe={recipe} onFinish={() => { window.speechSynthesis.cancel(); router.push('/cooklog'); }} />;
     }
 
     // Cooking Phase
@@ -360,7 +428,7 @@ function CookContent() {
         <div className="min-h-screen bg-black flex flex-col">
             {/* Header */}
             <header className="px-5 py-4 flex items-center justify-between border-b border-dark-border">
-                <button onClick={() => setPhase('overview')} className="text-gray-400">
+                <button onClick={() => { window.speechSynthesis.cancel(); setPhase('overview'); }} className="text-gray-400">
                     <ArrowLeft className="w-5 h-5" />
                 </button>
                 <span className="text-sm text-gray-400">

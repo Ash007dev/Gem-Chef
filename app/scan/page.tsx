@@ -2,13 +2,14 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Camera, Upload, Shuffle, MapPin, Utensils, Leaf, SlidersHorizontal, ChefHat } from 'lucide-react';
+import { Camera, Upload, Shuffle, MapPin, Utensils, Leaf, SlidersHorizontal, ChefHat, User } from 'lucide-react';
 import { identifyIngredients, fileToBase64 } from '@/utils/gemini';
 import PersonalizeSheet from '@/components/PersonalizeSheet';
 
 type MealTime = 'Breakfast' | 'Brunch' | 'Lunch' | 'Snack' | 'Dinner';
 type DietaryPref = 'Veg' | 'Non-Veg' | 'Both';
 type CookingStyle = 'Quick & Easy' | 'Restaurant Style' | 'Healthy' | 'Comfort Food';
+type AgeGroup = 'Baby (0-2)' | 'Toddler (2-5)' | 'Kid (5-12)' | 'Teen (13-19)' | 'Adult (20-59)' | 'Senior (60+)';
 
 export default function ScanPage() {
     const router = useRouter();
@@ -17,12 +18,14 @@ export default function ScanPage() {
     // Context state
     const [location, setLocation] = useState('Detecting...');
     const [greeting, setGreeting] = useState('');
+    const [mounted, setMounted] = useState(false);
 
-    // Preferences
+    // Preferences — use plain defaults for SSR, load from localStorage after mount
     const [mealTime, setMealTime] = useState<MealTime>('Lunch');
     const [dietary, setDietary] = useState<DietaryPref>('Both');
     const [cuisine, setCuisine] = useState('Same as Location');
     const [cookingStyle, setCookingStyle] = useState<CookingStyle>('Quick & Easy');
+    const [ageGroup, setAgeGroup] = useState<AgeGroup>('Adult (20-59)');
     const [showPersonalize, setShowPersonalize] = useState(false);
 
     // Ingredients
@@ -30,7 +33,7 @@ export default function ScanPage() {
     const [isScanning, setIsScanning] = useState(false);
     const [error, setError] = useState('');
 
-    // Get time-based greeting and auto-select meal, load saved preferences
+    // Get time-based greeting, auto-select meal, and load saved preferences
     useEffect(() => {
         // Time-based meal selection
         const hour = new Date().getHours();
@@ -51,17 +54,30 @@ export default function ScanPage() {
             setMealTime('Dinner');
         }
 
-        // Load saved preferences
+        // Load saved preferences from localStorage
         const saved = localStorage.getItem('smartchef_preferences');
         if (saved) {
             const prefs = JSON.parse(saved);
             if (prefs.dietary) setDietary(prefs.dietary);
             if (prefs.location) setLocation(prefs.location);
+            if (prefs.ageGroup) setAgeGroup(prefs.ageGroup);
+            if (prefs.cookingStyle) setCookingStyle(prefs.cookingStyle);
         }
+
+        setMounted(true);
     }, []);
 
-    // Get location
+    // Get location (only if no saved location)
     useEffect(() => {
+        if (!mounted) return;
+
+        // If we already loaded a location from preferences, skip detection
+        const saved = localStorage.getItem('smartchef_preferences');
+        if (saved) {
+            const prefs = JSON.parse(saved);
+            if (prefs.location && prefs.location !== 'Detecting...' && prefs.location !== 'Your City') return;
+        }
+
         const getLocation = async () => {
             if (typeof window === 'undefined' || !navigator.geolocation) {
                 setLocation('Your City');
@@ -114,7 +130,7 @@ export default function ScanPage() {
         };
 
         getLocation();
-    }, []);
+    }, [mounted]);
 
     const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -150,6 +166,7 @@ export default function ScanPage() {
             location: location,
             style: cookingStyle,
             cuisine: cuisine,
+            ageGroup: ageGroup,
         });
 
         router.push(`/recipes?${params.toString()}`);
@@ -170,6 +187,7 @@ export default function ScanPage() {
 
             {/* Context Chips */}
             <div className="flex flex-wrap items-center gap-2 mb-8">
+                {mounted ? (<>
                 <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card rounded-full">
                     <Utensils className="w-3.5 h-3.5 text-gray-400" />
                     <span className="text-sm text-white">{mealTime}</span>
@@ -186,6 +204,10 @@ export default function ScanPage() {
                     <MapPin className="w-3.5 h-3.5 text-gray-400" />
                     <span className="text-sm text-white">{location}</span>
                 </div>
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card rounded-full">
+                    <User className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="text-sm text-white">{ageGroup}</span>
+                </div>
                 <button
                     onClick={() => setShowPersonalize(true)}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-900/30 border border-indigo-800 rounded-full"
@@ -193,9 +215,13 @@ export default function ScanPage() {
                     <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
                     <span className="text-sm text-indigo-300">Personalize</span>
                 </button>
+                </>) : (
+                    <div className="h-8 w-full animate-pulse bg-dark-card rounded-full" />
+                )}
             </div>
 
             {/* Meal Time Selector */}
+            {mounted && (
             <section className="mb-6">
                 <h2 className="text-sm font-medium text-gray-400 mb-3">Meal Time</h2>
                 <div className="flex flex-wrap gap-2">
@@ -213,8 +239,10 @@ export default function ScanPage() {
                     ))}
                 </div>
             </section>
+            )}
 
             {/* Dietary Preference */}
+            {mounted && (
             <section className="mb-8">
                 <h2 className="text-sm font-medium text-gray-400 mb-3">Dietary Preference</h2>
                 <div className="flex flex-wrap gap-2">
@@ -232,6 +260,7 @@ export default function ScanPage() {
                     ))}
                 </div>
             </section>
+            )}
 
             {/* Scan Section */}
             <section className="mb-8">
@@ -324,10 +353,12 @@ export default function ScanPage() {
                     setDietary(prefs.dietary);
                     setCuisine(prefs.cuisine);
                     setCookingStyle(prefs.cookingStyle);
+                    setAgeGroup(prefs.ageGroup);
                 }}
                 initialMeal={mealTime}
                 initialDietary={dietary}
                 initialStyle={cookingStyle}
+                initialAgeGroup={ageGroup}
             />
         </div>
     );

@@ -25,6 +25,12 @@ export default function BottomNav() {
                         <Link
                             key={item.href}
                             href={item.href}
+                            onClick={() => {
+                                // Stop any ongoing speech when navigating away
+                                if (typeof window !== 'undefined' && window.speechSynthesis) {
+                                    window.speechSynthesis.cancel();
+                                }
+                            }}
                             className={`flex flex-col items-center justify-center gap-1 min-w-[64px] py-2 rounded-lg transition-colors ${isActive
                                     ? 'text-white'
                                     : 'text-gray-500 hover:text-gray-300'

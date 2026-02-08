@@ -6,10 +6,12 @@ import { ChevronRight, ChevronDown, MapPin, Check, Plus } from 'lucide-react';
 // Types
 type DietaryPref = 'Veg' | 'Non-Veg' | 'Both';
 type MealType = 'Breakfast' | 'Brunch' | 'Lunch' | 'Snack' | 'Dinner';
+type AgeGroup = 'Baby (0-2)' | 'Toddler (2-5)' | 'Kid (5-12)' | 'Teen (13-19)' | 'Adult (20-59)' | 'Senior (60+)';
 
 interface Preferences {
     location: string;
     dietary: DietaryPref;
+    ageGroup: AgeGroup;
     cuisinePreferences: Record<MealType, string>;
     customCuisines: string[];
     dislikedDishes: string[];
@@ -19,6 +21,7 @@ interface Preferences {
 const DEFAULT_PREFERENCES: Preferences = {
     location: '',
     dietary: 'Both',
+    ageGroup: 'Adult (20-59)',
     cuisinePreferences: {
         Breakfast: 'Same as Location',
         Brunch: 'Same as Location',
@@ -60,8 +63,9 @@ export default function PreferencesPage() {
     const [expandedMeal, setExpandedMeal] = useState<MealType | null>(null);
     const [isDetecting, setIsDetecting] = useState(false);
     const [customInput, setCustomInput] = useState('');
+    const [loaded, setLoaded] = useState(false);
 
-    // Load preferences from localStorage
+    // Load preferences from localStorage after mount (avoids hydration mismatch)
     useEffect(() => {
         const saved = localStorage.getItem('smartchef_preferences');
         if (saved) {
@@ -69,12 +73,14 @@ export default function PreferencesPage() {
         } else {
             detectLocation();
         }
+        setLoaded(true);
     }, []);
 
-    // Save preferences to localStorage
+    // Save preferences to localStorage (only after initial load)
     useEffect(() => {
+        if (!loaded) return;
         localStorage.setItem('smartchef_preferences', JSON.stringify(preferences));
-    }, [preferences]);
+    }, [preferences, loaded]);
 
     const detectLocation = async () => {
         setIsDetecting(true);
@@ -120,8 +126,13 @@ export default function PreferencesPage() {
         setExpandedMeal(null);
     };
 
+    const updateAgeGroup = (value: AgeGroup) => {
+        setPreferences(prev => ({ ...prev, ageGroup: value }));
+    };
+
     const mealTypes: MealType[] = ['Breakfast', 'Brunch', 'Lunch', 'Snack', 'Dinner'];
     const dietaryOptions: DietaryPref[] = ['Veg', 'Non-Veg', 'Both'];
+    const ageGroups: AgeGroup[] = ['Baby (0-2)', 'Toddler (2-5)', 'Kid (5-12)', 'Teen (13-19)', 'Adult (20-59)', 'Senior (60+)'];
 
     return (
         <div className="min-h-screen bg-black px-5 pt-12 pb-24">
@@ -129,6 +140,17 @@ export default function PreferencesPage() {
             <header className="mb-8">
                 <h1 className="text-2xl font-semibold text-white">Settings</h1>
             </header>
+
+            {!loaded ? (
+                <div className="space-y-8">
+                    {[1, 2, 3].map(i => (
+                        <div key={i} className="space-y-3">
+                            <div className="h-4 w-24 bg-dark-card rounded animate-pulse" />
+                            <div className="h-12 w-full bg-dark-card rounded-xl animate-pulse" />
+                        </div>
+                    ))}
+                </div>
+            ) : (<>
 
             {/* Location Section */}
             <section className="mb-8">
@@ -160,6 +182,25 @@ export default function PreferencesPage() {
                             key={option}
                             onClick={() => updateDietary(option)}
                             className={`flex-1 py-3 rounded-xl text-sm font-medium transition-colors ${preferences.dietary === option
+                                ? 'bg-white text-black'
+                                : 'bg-dark-card border border-dark-border text-gray-400'
+                                }`}
+                        >
+                            {option}
+                        </button>
+                    ))}
+                </div>
+            </section>
+
+            {/* Age Group */}
+            <section className="mb-8">
+                <h2 className="text-sm font-medium text-gray-500 mb-3">Cooking For</h2>
+                <div className="flex flex-wrap gap-2">
+                    {ageGroups.map((option) => (
+                        <button
+                            key={option}
+                            onClick={() => updateAgeGroup(option)}
+                            className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${preferences.ageGroup === option
                                 ? 'bg-white text-black'
                                 : 'bg-dark-card border border-dark-border text-gray-400'
                                 }`}
@@ -289,6 +330,8 @@ export default function PreferencesPage() {
             >
                 Reset to Defaults
             </button>
+
+            </>)}
         </div>
     );
 }
