@@ -5,8 +5,8 @@ import { usePathname } from 'next/navigation';
 import { Home, Camera, BookOpen, Settings } from 'lucide-react';
 
 const navItems = [
-    { href: '/home', label: 'Home', icon: Home },
-    { href: '/', label: 'Scan', icon: Camera },
+    { href: '/', label: 'Home', icon: Home },
+    { href: '/scan', label: 'Scan', icon: Camera },
     { href: '/cooklog', label: 'Cooklog', icon: BookOpen },
     { href: '/preferences', label: 'Settings', icon: Settings },
 ];

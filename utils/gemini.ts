@@ -6,7 +6,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
 // Priority ordered Gemini models (fallback order)
 const MODEL_PRIORITY: string[] = [
     'gemini-2.0-flash',
-    'gemini-1.5-flash'
+    'gemini-2.0-flash-lite'
 ];
 
 // Helper to try models in sequence

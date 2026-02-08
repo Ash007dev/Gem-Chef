@@ -237,7 +237,7 @@ function CookContent() {
         if (stored) {
             setRecipe(JSON.parse(stored));
         } else {
-            router.push('/');
+            router.push('/scan');
         }
     }, [router]);
 

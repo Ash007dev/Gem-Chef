@@ -46,6 +46,9 @@ function RecipesContent() {
         try {
             const result = await generateRecipes(ingredients, { meal, dietary, location, style, cuisine });
             setRecipes(result);
+            // Cache recipes so back navigation doesn't regenerate
+            sessionStorage.setItem('cachedRecipes', JSON.stringify(result));
+            sessionStorage.setItem('cachedRecipesKey', ingredients.join(','));
             // Auto-expand first recipe
             if (result.length > 0) {
                 setExpandedId(result[0].id);
@@ -59,10 +62,25 @@ function RecipesContent() {
     };
 
     useEffect(() => {
+        // Check if we have cached recipes for the same ingredients
+        const cachedKey = sessionStorage.getItem('cachedRecipesKey');
+        const cached = sessionStorage.getItem('cachedRecipes');
+        if (cached && cachedKey === ingredients.join(',')) {
+            const parsed = JSON.parse(cached) as Recipe[];
+            setRecipes(parsed);
+            if (parsed.length > 0) {
+                setExpandedId(parsed[0].id);
+            }
+            setLoading(false);
+            return;
+        }
         fetchRecipes();
     }, []);
 
     const handleRethink = () => {
+        // Clear cache so new recipes are generated
+        sessionStorage.removeItem('cachedRecipes');
+        sessionStorage.removeItem('cachedRecipesKey');
         fetchRecipes();
     };
 
