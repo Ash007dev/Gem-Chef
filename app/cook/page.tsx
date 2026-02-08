@@ -87,15 +87,24 @@ function FailureModal({
 
 // Completion Modal
 function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () => void }) {
-    // Save to cooklog
+    // Save to cooklog (prevent duplicates - only add once per recipe per session)
     useEffect(() => {
         const savedLog = localStorage.getItem('cooklog');
         const cooklog = savedLog ? JSON.parse(savedLog) : [];
-        cooklog.unshift({
-            ...recipe,
-            cookedAt: new Date().toISOString()
-        });
-        localStorage.setItem('cooklog', JSON.stringify(cooklog.slice(0, 50)));
+        
+        // Check if this exact recipe was already logged today
+        const today = new Date().toDateString();
+        const alreadyLogged = cooklog.some(
+            (entry: any) => entry.id === recipe.id && new Date(entry.cookedAt).toDateString() === today
+        );
+        
+        if (!alreadyLogged) {
+            cooklog.unshift({
+                ...recipe,
+                cookedAt: new Date().toISOString()
+            });
+            localStorage.setItem('cooklog', JSON.stringify(cooklog.slice(0, 50)));
+        }
     }, [recipe]);
 
     return (

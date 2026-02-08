@@ -305,28 +305,6 @@ export default function HomePage() {
                 </section>
             )}
 
-            {/* Demo Mode */}
-            {ingredients.length === 0 && (
-                <section className="mb-8">
-                    <p className="text-gray-500 text-sm mb-3">Or try with sample ingredients:</p>
-                    <div className="flex flex-wrap gap-2">
-                        {[
-                            { label: 'Italian', items: ['Pasta', 'Tomatoes', 'Basil', 'Garlic', 'Olive Oil'] },
-                            { label: 'Indian', items: ['Rice', 'Dal', 'Onion', 'Tomato', 'Spices'] },
-                            { label: 'Asian', items: ['Rice', 'Soy Sauce', 'Ginger', 'Vegetables'] },
-                        ].map((preset) => (
-                            <button
-                                key={preset.label}
-                                onClick={() => setIngredients(preset.items)}
-                                className="px-3 py-1.5 bg-dark-card border border-dark-border rounded-full text-sm text-gray-400 hover:text-white transition-colors"
-                            >
-                                {preset.label}
-                            </button>
-                        ))}
-                    </div>
-                </section>
-            )}
-
             {/* Get Recipes Button */}
             {ingredients.length > 0 && (
                 <button
