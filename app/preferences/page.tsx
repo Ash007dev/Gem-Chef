@@ -8,6 +8,12 @@ type DietaryPref = 'Veg' | 'Non-Veg' | 'Both';
 type MealType = 'Breakfast' | 'Brunch' | 'Lunch' | 'Snack' | 'Dinner';
 type AgeGroup = 'Baby (0-2)' | 'Toddler (2-5)' | 'Kid (5-12)' | 'Teen (13-19)' | 'Adult (20-59)' | 'Senior (60+)';
 
+// Health conditions
+type HealthCondition = 'Diabetes' | 'Hypertension' | 'High Cholesterol' | 'PCOD/PCOS' | 'Thyroid' | 'Heart Disease' | 'Kidney Issues';
+
+// Common allergies
+type Allergy = 'Nuts' | 'Peanuts' | 'Dairy' | 'Gluten' | 'Eggs' | 'Shellfish' | 'Soy' | 'Fish' | 'Sesame';
+
 interface Preferences {
     location: string;
     dietary: DietaryPref;
@@ -16,6 +22,10 @@ interface Preferences {
     customCuisines: string[];
     dislikedDishes: string[];
     autoDeleteDays: number;
+    // Health Profile
+    healthConditions: HealthCondition[];
+    allergies: Allergy[];
+    customAllergies: string[];
 }
 
 const DEFAULT_PREFERENCES: Preferences = {
@@ -32,7 +42,33 @@ const DEFAULT_PREFERENCES: Preferences = {
     customCuisines: [],
     dislikedDishes: [],
     autoDeleteDays: 7,
+    // Health Profile defaults
+    healthConditions: [],
+    allergies: [],
+    customAllergies: [],
 };
+
+const HEALTH_CONDITIONS: HealthCondition[] = [
+    'Diabetes',
+    'Hypertension',
+    'High Cholesterol',
+    'PCOD/PCOS',
+    'Thyroid',
+    'Heart Disease',
+    'Kidney Issues',
+];
+
+const COMMON_ALLERGIES: Allergy[] = [
+    'Nuts',
+    'Peanuts',
+    'Dairy',
+    'Gluten',
+    'Eggs',
+    'Shellfish',
+    'Soy',
+    'Fish',
+    'Sesame',
+];
 
 const CUISINES = [
     'Same as Location',
@@ -228,6 +264,143 @@ export default function PreferencesPage() {
                             </button>
                         ))}
                     </div>
+                </section>
+
+                {/* Health Profile Section */}
+                <section className="mb-8">
+                    <h2 className="text-sm font-medium text-gray-500 mb-1">Health Profile</h2>
+                    <p className="text-xs text-gray-600 mb-4">Recipes will be adjusted based on your health needs</p>
+
+                    {/* Health Conditions */}
+                    <div className="mb-4">
+                        <h3 className="text-xs font-medium text-gray-400 mb-2">Health Conditions</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {HEALTH_CONDITIONS.map((condition) => {
+                                const isSelected = preferences.healthConditions.includes(condition);
+                                return (
+                                    <button
+                                        key={condition}
+                                        onClick={() => {
+                                            setPreferences(prev => ({
+                                                ...prev,
+                                                healthConditions: isSelected
+                                                    ? prev.healthConditions.filter(c => c !== condition)
+                                                    : [...prev.healthConditions, condition]
+                                            }));
+                                        }}
+                                        className={`px-3 py-2 rounded-lg text-sm transition-colors ${isSelected
+                                            ? 'bg-red-500/20 border border-red-500/40 text-red-400'
+                                            : 'bg-dark-card border border-dark-border text-gray-400'
+                                            }`}
+                                    >
+                                        {condition}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Allergies */}
+                    <div className="mb-4">
+                        <h3 className="text-xs font-medium text-gray-400 mb-2">Allergies</h3>
+                        <div className="flex flex-wrap gap-2">
+                            {COMMON_ALLERGIES.map((allergy) => {
+                                const isSelected = preferences.allergies.includes(allergy);
+                                return (
+                                    <button
+                                        key={allergy}
+                                        onClick={() => {
+                                            setPreferences(prev => ({
+                                                ...prev,
+                                                allergies: isSelected
+                                                    ? prev.allergies.filter(a => a !== allergy)
+                                                    : [...prev.allergies, allergy]
+                                            }));
+                                        }}
+                                        className={`px-3 py-2 rounded-lg text-sm transition-colors ${isSelected
+                                            ? 'bg-orange-500/20 border border-orange-500/40 text-orange-400'
+                                            : 'bg-dark-card border border-dark-border text-gray-400'
+                                            }`}
+                                    >
+                                        {allergy}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Custom Allergy Input */}
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            placeholder="Add custom allergy..."
+                            className="flex-1 px-3 py-2 bg-dark-card border border-dark-border rounded-lg text-white text-sm placeholder:text-gray-600"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    const input = e.currentTarget.value.trim();
+                                    if (input && !preferences.customAllergies.includes(input)) {
+                                        setPreferences(prev => ({
+                                            ...prev,
+                                            customAllergies: [...prev.customAllergies, input]
+                                        }));
+                                        e.currentTarget.value = '';
+                                    }
+                                }
+                            }}
+                        />
+                        <button
+                            onClick={() => {
+                                const input = document.querySelector<HTMLInputElement>('input[placeholder="Add custom allergy..."]');
+                                if (input && input.value.trim()) {
+                                    const value = input.value.trim();
+                                    if (!preferences.customAllergies.includes(value)) {
+                                        setPreferences(prev => ({
+                                            ...prev,
+                                            customAllergies: [...prev.customAllergies, value]
+                                        }));
+                                        input.value = '';
+                                    }
+                                }
+                            }}
+                            className="px-3 py-2 bg-white text-black rounded-lg text-sm font-medium"
+                        >
+                            Add
+                        </button>
+                    </div>
+
+                    {/* Custom Allergies Display */}
+                    {preferences.customAllergies.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-3">
+                            {preferences.customAllergies.map((allergy) => (
+                                <div
+                                    key={allergy}
+                                    className="flex items-center gap-1 px-3 py-1.5 bg-orange-500/20 border border-orange-500/40 rounded-lg"
+                                >
+                                    <span className="text-orange-400 text-sm">{allergy}</span>
+                                    <button
+                                        onClick={() => {
+                                            setPreferences(prev => ({
+                                                ...prev,
+                                                customAllergies: prev.customAllergies.filter(a => a !== allergy)
+                                            }));
+                                        }}
+                                        className="text-orange-400/60 hover:text-orange-400 ml-1"
+                                    >
+                                        ×
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* Health Summary */}
+                    {(preferences.healthConditions.length > 0 || preferences.allergies.length > 0 || preferences.customAllergies.length > 0) && (
+                        <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                            <p className="text-green-400 text-xs">
+                                Recipes will automatically avoid or substitute ingredients unsuitable for your health profile.
+                            </p>
+                        </div>
+                    )}
                 </section>
 
                 {/* Cuisine Preferences */}

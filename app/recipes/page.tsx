@@ -34,9 +34,11 @@ function RecipesContent() {
     const style = searchParams.get('style') || 'Quick & Easy';
     const cuisine = searchParams.get('cuisine') || 'Same as Location';
     const ageGroup = searchParams.get('ageGroup') || 'Adult (20-59)';
+    const healthConditions = searchParams.get('healthConditions')?.split(',').filter(Boolean) || [];
+    const allergies = searchParams.get('allergies')?.split(',').filter(Boolean) || [];
 
     // Build a full cache key from all params to detect changes
-    const cacheKey = [ingredients.join(','), meal, dietary, location, style, cuisine, ageGroup].join('|');
+    const cacheKey = [ingredients.join(','), meal, dietary, location, style, cuisine, ageGroup, healthConditions.join(','), allergies.join(',')].join('|');
 
     const fetchRecipes = async () => {
         if (ingredients.length === 0) {
@@ -49,7 +51,10 @@ function RecipesContent() {
         setError('');
 
         try {
-            const result = await generateRecipes(ingredients, { meal, dietary, location, style, cuisine, ageGroup });
+            const result = await generateRecipes(ingredients, {
+                meal, dietary, location, style, cuisine, ageGroup,
+                healthConditions, allergies
+            });
             setRecipes(result);
             // Cache recipes so back navigation doesn't regenerate
             sessionStorage.setItem('cachedRecipes', JSON.stringify(result));

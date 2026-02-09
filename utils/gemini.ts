@@ -209,6 +209,7 @@ export interface Recipe {
     type: 'quick' | 'traditional' | 'healthy' | 'comfort' | 'fusion' | 'simple' | 'regional';
     isRegional?: boolean;
     pairingsuggestion?: string;
+    healthNotes?: string;
     ingredients: {
         provided: string[];
         shoppingList: string[];
@@ -230,6 +231,9 @@ export async function generateRecipes(
         style?: string;
         cuisine?: string;
         ageGroup?: string;
+        // Health profile
+        healthConditions?: string[];
+        allergies?: string[];
     } = {}
 ): Promise<Recipe[]> {
     return generateWithFallback(async (modelName) => {
@@ -247,11 +251,52 @@ export async function generateRecipes(
             location = '',
             style = 'Quick & Easy',
             cuisine = 'Same as Location',
-            ageGroup = 'Adult (20-59)'
+            ageGroup = 'Adult (20-59)',
+            healthConditions = [],
+            allergies = []
         } = context;
 
         // Determine the cuisine to use
         const effectiveCuisine = cuisine === 'Same as Location' ? location : cuisine;
+
+        // Build health constraint prompt
+        let healthConstraint = '';
+        if (healthConditions.length > 0 || allergies.length > 0) {
+            healthConstraint = `
+        *** CRITICAL HEALTH PROFILE - SAFETY REQUIREMENTS ***
+        ${healthConditions.length > 0 ? `
+        The user has the following HEALTH CONDITIONS: ${healthConditions.join(', ')}
+        
+        Recipe requirements based on health conditions:
+        ${healthConditions.includes('Diabetes') ? '- DIABETES: Avoid high-sugar ingredients, white rice, white bread, potatoes. Prefer whole grains, low-GI foods. No desserts with refined sugar.' : ''}
+        ${healthConditions.includes('Hypertension') ? '- HYPERTENSION: Minimize salt/sodium. Avoid pickles, papad, processed foods, soy sauce. Use herbs and spices for flavor instead.' : ''}
+        ${healthConditions.includes('High Cholesterol') ? '- HIGH CHOLESTEROL: Avoid fried foods, ghee, butter, full-fat dairy, red meat, organ meats. Prefer olive oil, lean proteins.' : ''}
+        ${healthConditions.includes('PCOD/PCOS') ? '- PCOD/PCOS: Avoid refined carbs, sugary foods, dairy. Include anti-inflammatory foods, lean proteins, fiber-rich ingredients.' : ''}
+        ${healthConditions.includes('Thyroid') ? '- THYROID: Limit cruciferous vegetables (raw cabbage, broccoli), soy products. Include selenium-rich foods, iodized salt in moderation.' : ''}
+        ${healthConditions.includes('Heart Disease') ? '- HEART DISEASE: No fried foods, limit sodium, avoid saturated fats. Include omega-3 rich foods, whole grains, vegetables.' : ''}
+        ${healthConditions.includes('Kidney Issues') ? '- KIDNEY ISSUES: Limit potassium (bananas, potatoes, tomatoes), phosphorus (dairy, nuts), and sodium. Control protein portions.' : ''}
+        ` : ''}
+        
+        ${allergies.length > 0 ? `
+        The user has the following ALLERGIES: ${allergies.join(', ')}
+        
+        ABSOLUTELY DO NOT include these ingredients or any derivatives:
+        ${allergies.includes('Nuts') ? '- NO NUTS: almonds, cashews, walnuts, pistachios, hazelnuts, pecans, macadamia, nut oils, nut butters' : ''}
+        ${allergies.includes('Peanuts') ? '- NO PEANUTS: peanuts, peanut oil, peanut butter, groundnut' : ''}
+        ${allergies.includes('Dairy') ? '- NO DAIRY: milk, cream, butter, ghee, cheese, paneer, yogurt, curd, whey, casein' : ''}
+        ${allergies.includes('Gluten') ? '- NO GLUTEN: wheat, barley, rye, semolina, rava, maida, regular soy sauce, most bread/pasta. Use rice, millet, or certified gluten-free alternatives.' : ''}
+        ${allergies.includes('Eggs') ? '- NO EGGS: eggs, mayonnaise, egg noodles, dishes with egg wash or egg binding' : ''}
+        ${allergies.includes('Shellfish') ? '- NO SHELLFISH: shrimp, prawns, crab, lobster, oysters, mussels, clams, scallops' : ''}
+        ${allergies.includes('Soy') ? '- NO SOY: soy sauce, tofu, tempeh, edamame, soy milk, soy lecithin' : ''}
+        ${allergies.includes('Fish') ? '- NO FISH: any fish, fish sauce, fish oil, anchovy paste' : ''}
+        ${allergies.includes('Sesame') ? '- NO SESAME: sesame seeds, tahini, sesame oil, til' : ''}
+        
+        Double-check EVERY ingredient to ensure no allergens are present, including hidden sources.
+        ` : ''}
+        
+        For each recipe, include a "healthNotes" field explaining why this recipe is suitable for the user's health profile.
+        `;
+        }
 
         // Map cooking style to recipe generation hints
         const styleHints: Record<string, string> = {
@@ -380,6 +425,7 @@ export async function generateRecipes(
         - Cooking style: ${style} - ${styleHints[style] || 'Balanced approach'}
         - Cooking for age group: ${ageGroup}
         ${ageConstraint}
+        ${healthConstraint}
         ${effectiveCuisine ? `- Cuisine/Region: ${effectiveCuisine}` : ''}
         
         ${dietary === 'Veg' ? `*** EXTREMELY IMPORTANT DIETARY CONSTRAINT ***
@@ -396,13 +442,13 @@ export async function generateRecipes(
         
         NEXT 6 - REGULAR RECIPES based on "${style}" style:
         ${style === 'Quick & Easy' ?
-                '4. Super Quick (15 min), 5. Easy Weeknight, 6. No-Cook/Minimal, 7. One-Pan, 8. 5-Ingredient, 9. Microwave-Friendly' :
-                style === 'Restaurant Style' ?
-                    '4. Fine Dining, 5. Professional Plating, 6. Complex Flavors, 7. Gourmet Fusion, 8. Chef\'s Special, 9. Signature Dish' :
-                    style === 'Healthy' ?
-                        '4. Low-Carb, 5. High-Protein, 6. Superfood Bowl, 7. Clean Eating, 8. Meal Prep Friendly, 9. Light & Fresh' :
-                        '4. Nostalgic Home Cooking, 5. Hearty One-Pot, 6. Creamy & Rich, 7. Fried Favorites, 8. Slow-Cooked, 9. Family Recipe Style'
-            }
+                    '4. Super Quick (15 min), 5. Easy Weeknight, 6. No-Cook/Minimal, 7. One-Pan, 8. 5-Ingredient, 9. Microwave-Friendly' :
+                    style === 'Restaurant Style' ?
+                        '4. Fine Dining, 5. Professional Plating, 6. Complex Flavors, 7. Gourmet Fusion, 8. Chef\'s Special, 9. Signature Dish' :
+                        style === 'Healthy' ?
+                            '4. Low-Carb, 5. High-Protein, 6. Superfood Bowl, 7. Clean Eating, 8. Meal Prep Friendly, 9. Light & Fresh' :
+                            '4. Nostalgic Home Cooking, 5. Hearty One-Pot, 6. Creamy & Rich, 7. Fried Favorites, 8. Slow-Cooked, 9. Family Recipe Style'
+                }
         `}
 
         CRITICAL REQUIREMENTS FOR BEGINNER-FRIENDLY RECIPES:

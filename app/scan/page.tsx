@@ -159,6 +159,12 @@ export default function ScanPage() {
     const handleGetRecipes = () => {
         if (ingredients.length === 0) return;
 
+        // Load health profile from preferences
+        const saved = localStorage.getItem('smartchef_preferences');
+        const prefs = saved ? JSON.parse(saved) : {};
+        const healthConditions = prefs.healthConditions || [];
+        const allergies = [...(prefs.allergies || []), ...(prefs.customAllergies || [])];
+
         const params = new URLSearchParams({
             ingredients: ingredients.join(','),
             meal: mealTime,
@@ -168,6 +174,14 @@ export default function ScanPage() {
             cuisine: cuisine,
             ageGroup: ageGroup,
         });
+
+        // Add health profile if present
+        if (healthConditions.length > 0) {
+            params.set('healthConditions', healthConditions.join(','));
+        }
+        if (allergies.length > 0) {
+            params.set('allergies', allergies.join(','));
+        }
 
         router.push(`/recipes?${params.toString()}`);
     };
@@ -188,33 +202,33 @@ export default function ScanPage() {
             {/* Context Chips */}
             <div className="flex flex-wrap items-center gap-2 mb-8">
                 {mounted ? (<>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card rounded-full">
-                    <Utensils className="w-3.5 h-3.5 text-gray-400" />
-                    <span className="text-sm text-white">{mealTime}</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card rounded-full">
-                    <Leaf className="w-3.5 h-3.5 text-gray-400" />
-                    <span className="text-sm text-white">{dietary}</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card rounded-full">
-                    <ChefHat className="w-3.5 h-3.5 text-gray-400" />
-                    <span className="text-sm text-white">{cookingStyle}</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card rounded-full">
-                    <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                    <span className="text-sm text-white">{location}</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card rounded-full">
-                    <User className="w-3.5 h-3.5 text-gray-400" />
-                    <span className="text-sm text-white">{ageGroup}</span>
-                </div>
-                <button
-                    onClick={() => setShowPersonalize(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-900/30 border border-indigo-800 rounded-full"
-                >
-                    <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
-                    <span className="text-sm text-indigo-300">Personalize</span>
-                </button>
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card rounded-full">
+                        <Utensils className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="text-sm text-white">{mealTime}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card rounded-full">
+                        <Leaf className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="text-sm text-white">{dietary}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card rounded-full">
+                        <ChefHat className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="text-sm text-white">{cookingStyle}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card rounded-full">
+                        <MapPin className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="text-sm text-white">{location}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card rounded-full">
+                        <User className="w-3.5 h-3.5 text-gray-400" />
+                        <span className="text-sm text-white">{ageGroup}</span>
+                    </div>
+                    <button
+                        onClick={() => setShowPersonalize(true)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-900/30 border border-indigo-800 rounded-full"
+                    >
+                        <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
+                        <span className="text-sm text-indigo-300">Personalize</span>
+                    </button>
                 </>) : (
                     <div className="h-8 w-full animate-pulse bg-dark-card rounded-full" />
                 )}
@@ -222,44 +236,44 @@ export default function ScanPage() {
 
             {/* Meal Time Selector */}
             {mounted && (
-            <section className="mb-6">
-                <h2 className="text-sm font-medium text-gray-400 mb-3">Meal Time</h2>
-                <div className="flex flex-wrap gap-2">
-                    {mealTimes.map((meal) => (
-                        <button
-                            key={meal}
-                            onClick={() => setMealTime(meal)}
-                            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${mealTime === meal
-                                ? 'bg-white text-black'
-                                : 'bg-dark-card text-gray-400 hover:text-white'
-                                }`}
-                        >
-                            {meal}
-                        </button>
-                    ))}
-                </div>
-            </section>
+                <section className="mb-6">
+                    <h2 className="text-sm font-medium text-gray-400 mb-3">Meal Time</h2>
+                    <div className="flex flex-wrap gap-2">
+                        {mealTimes.map((meal) => (
+                            <button
+                                key={meal}
+                                onClick={() => setMealTime(meal)}
+                                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${mealTime === meal
+                                    ? 'bg-white text-black'
+                                    : 'bg-dark-card text-gray-400 hover:text-white'
+                                    }`}
+                            >
+                                {meal}
+                            </button>
+                        ))}
+                    </div>
+                </section>
             )}
 
             {/* Dietary Preference */}
             {mounted && (
-            <section className="mb-8">
-                <h2 className="text-sm font-medium text-gray-400 mb-3">Dietary Preference</h2>
-                <div className="flex flex-wrap gap-2">
-                    {dietaryOptions.map((option) => (
-                        <button
-                            key={option}
-                            onClick={() => setDietary(option)}
-                            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${dietary === option
-                                ? 'bg-white text-black'
-                                : 'bg-dark-card text-gray-400 hover:text-white'
-                                }`}
-                        >
-                            {option}
-                        </button>
-                    ))}
-                </div>
-            </section>
+                <section className="mb-8">
+                    <h2 className="text-sm font-medium text-gray-400 mb-3">Dietary Preference</h2>
+                    <div className="flex flex-wrap gap-2">
+                        {dietaryOptions.map((option) => (
+                            <button
+                                key={option}
+                                onClick={() => setDietary(option)}
+                                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${dietary === option
+                                    ? 'bg-white text-black'
+                                    : 'bg-dark-card text-gray-400 hover:text-white'
+                                    }`}
+                            >
+                                {option}
+                            </button>
+                        ))}
+                    </div>
+                </section>
             )}
 
             {/* Scan Section */}

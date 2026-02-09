@@ -14,6 +14,7 @@ import {
     ArrowRight,
     Leaf,
     Utensils,
+    ImageIcon,
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -166,6 +167,16 @@ export default function LandingPage() {
                         <Settings className="w-5 h-5 text-gray-400 mb-3" />
                         <h4 className="text-white text-sm font-medium mb-0.5">Settings</h4>
                         <p className="text-gray-500 text-xs">Diet, cuisine & more</p>
+                    </button>
+
+                    {/* Plate to Recipe */}
+                    <button
+                        onClick={() => router.push('/plate-to-recipe')}
+                        className="bg-dark-card border border-dark-border rounded-xl p-4 text-left hover:bg-dark-elevated active:scale-[0.97] transition-all"
+                    >
+                        <ImageIcon className="w-5 h-5 text-orange-400 mb-3" />
+                        <h4 className="text-white text-sm font-medium mb-0.5">Plate to Recipe</h4>
+                        <p className="text-gray-500 text-xs">Photo to full recipe</p>
                     </button>
                 </div>
             </section>
