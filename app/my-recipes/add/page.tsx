@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useRef, useEffect, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
     ArrowLeft,
     Plus,
@@ -20,8 +20,10 @@ import { parseRecipeText, fileToBase64, UserRecipe } from '@/utils/gemini';
 
 type Tab = 'manual' | 'voice' | 'import';
 
-export default function AddRecipePage() {
+function AddRecipeContent() {
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const editId = searchParams.get('edit');
 
     /* ─── Active tab ─── */
     const [activeTab, setActiveTab] = useState<Tab>('manual');
@@ -51,6 +53,28 @@ export default function AddRecipePage() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [toast, setToast] = useState('');
+
+    /* ─── Load recipe for editing ─── */
+    useEffect(() => {
+        if (editId) {
+            const saved = localStorage.getItem('smartchef_my_recipes');
+            if (saved) {
+                const recipes: UserRecipe[] = JSON.parse(saved);
+                const recipe = recipes.find(r => r.id === editId);
+                if (recipe) {
+                    setTitle(recipe.title);
+                    setDescription(recipe.description || '');
+                    setServings(recipe.servings);
+                    setPrepTime(recipe.prepTime);
+                    setCookTime(recipe.cookTime);
+                    setDifficulty(recipe.difficulty);
+                    setIngredients(recipe.ingredients.length ? recipe.ingredients : ['']);
+                    setSteps(recipe.steps.length ? recipe.steps : ['']);
+                    setPhoto(recipe.photo || null);
+                }
+            }
+        }
+    }, [editId]);
 
     /* ─── Photo handler ─── */
     const photoInputRef = useRef<HTMLInputElement>(null);
@@ -175,23 +199,44 @@ export default function AddRecipePage() {
         setSaving(true);
         setError('');
 
-        const newRecipe: UserRecipe = {
-            id: `my_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-            title: title.trim(),
-            description: description.trim() || `A delicious ${title.trim()} recipe`,
-            servings,
-            prepTime,
-            cookTime,
-            difficulty,
-            ingredients: cleanIngredients,
-            steps: cleanSteps,
-            photo: photo || undefined,
-            createdAt: new Date().toISOString(),
-            source: activeTab === 'manual' ? 'manual' : activeTab === 'voice' ? 'voice' : 'text-import',
-        };
-
         const existing: UserRecipe[] = JSON.parse(localStorage.getItem('smartchef_my_recipes') || '[]');
-        existing.unshift(newRecipe);
+
+        if (editId) {
+            // Update existing recipe
+            const idx = existing.findIndex(r => r.id === editId);
+            if (idx !== -1) {
+                existing[idx] = {
+                    ...existing[idx],
+                    title: title.trim(),
+                    description: description.trim() || `A delicious ${title.trim()} recipe`,
+                    servings,
+                    prepTime,
+                    cookTime,
+                    difficulty,
+                    ingredients: cleanIngredients,
+                    steps: cleanSteps,
+                    photo: photo || undefined,
+                };
+            }
+        } else {
+            // Create new recipe
+            const newRecipe: UserRecipe = {
+                id: `my_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                title: title.trim(),
+                description: description.trim() || `A delicious ${title.trim()} recipe`,
+                servings,
+                prepTime,
+                cookTime,
+                difficulty,
+                ingredients: cleanIngredients,
+                steps: cleanSteps,
+                photo: photo || undefined,
+                createdAt: new Date().toISOString(),
+                source: activeTab === 'manual' ? 'manual' : activeTab === 'voice' ? 'voice' : 'text-import',
+            };
+            existing.unshift(newRecipe);
+        }
+
         localStorage.setItem('smartchef_my_recipes', JSON.stringify(existing));
 
         setSaving(false);
@@ -211,7 +256,7 @@ export default function AddRecipePage() {
                 <button onClick={() => router.back()} className="text-gray-400">
                     <ArrowLeft className="w-5 h-5" />
                 </button>
-                <h1 className="text-lg font-semibold text-white">Add Recipe</h1>
+                <h1 className="text-lg font-semibold text-white">{editId ? 'Edit Recipe' : 'Add Recipe'}</h1>
             </header>
 
             {/* Tab Switcher */}
@@ -223,11 +268,10 @@ export default function AddRecipePage() {
                         <button
                             key={tab.key}
                             onClick={() => setActiveTab(tab.key)}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                                isActive
-                                    ? 'bg-white text-black'
-                                    : 'bg-dark-card border border-dark-border text-gray-400'
-                            }`}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors ${isActive
+                                ? 'bg-white text-black'
+                                : 'bg-dark-card border border-dark-border text-gray-400'
+                                }`}
                         >
                             <Icon className="w-4 h-4" />
                             {tab.label}
@@ -255,11 +299,10 @@ export default function AddRecipePage() {
                     <div className="flex justify-center py-6">
                         <button
                             onClick={isListening ? stopListening : startListening}
-                            className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${
-                                isListening
-                                    ? 'bg-red-500 animate-pulse shadow-lg shadow-red-500/30'
-                                    : 'bg-white text-black'
-                            }`}
+                            className={`w-20 h-20 rounded-full flex items-center justify-center transition-all ${isListening
+                                ? 'bg-red-500 animate-pulse shadow-lg shadow-red-500/30'
+                                : 'bg-white text-black'
+                                }`}
                         >
                             {isListening
                                 ? <MicOff className="w-8 h-8 text-white" />
@@ -421,11 +464,10 @@ export default function AddRecipePage() {
                                 <button
                                     key={d}
                                     onClick={() => setDifficulty(d)}
-                                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${
-                                        difficulty === d
-                                            ? 'bg-white text-black'
-                                            : 'bg-dark-card border border-dark-border text-gray-400'
-                                    }`}
+                                    className={`flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors ${difficulty === d
+                                        ? 'bg-white text-black'
+                                        : 'bg-dark-card border border-dark-border text-gray-400'
+                                        }`}
                                 >
                                     {d}
                                 </button>
@@ -513,9 +555,9 @@ export default function AddRecipePage() {
                         className="w-full py-4 bg-white text-black rounded-xl font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 active:scale-[0.98] transition-transform"
                     >
                         {saving ? (
-                            <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                            <><Loader2 className="w-4 h-4 animate-spin" /> {editId ? 'Updating...' : 'Saving...'}</>
                         ) : (
-                            <><Save className="w-4 h-4" /> Save Recipe</>
+                            <><Save className="w-4 h-4" /> {editId ? 'Update Recipe' : 'Save Recipe'}</>
                         )}
                     </button>
                 </div>
@@ -529,5 +571,17 @@ export default function AddRecipePage() {
                 </div>
             )}
         </div>
+    );
+}
+
+export default function AddRecipePage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-black flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            </div>
+        }>
+            <AddRecipeContent />
+        </Suspense>
     );
 }

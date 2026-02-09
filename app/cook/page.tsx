@@ -907,12 +907,23 @@ function CookContent() {
         };
     }, []);
 
-    // Load recipe from sessionStorage or localStorage (for plate-to-recipe)
+    // Load recipe from sessionStorage or localStorage (for plate-to-recipe, worldwide, inventory suggestions)
     useEffect(() => {
         // First check sessionStorage (main flow)
         let stored = sessionStorage.getItem('currentRecipe');
 
-        // Fallback: check localStorage for plate-to-recipe
+        // Fallback 1: check localStorage for currentRecipe (WorldWide dishes, Inventory suggestions)
+        if (!stored) {
+            stored = localStorage.getItem('currentRecipe');
+            if (stored) {
+                // Clear after loading so it doesn't persist
+                localStorage.removeItem('currentRecipe');
+                setRecipe(JSON.parse(stored));
+                return;
+            }
+        }
+
+        // Fallback 2: check localStorage for plate-to-recipe
         if (!stored) {
             const plateRecipe = localStorage.getItem('plate_to_recipe_current');
             if (plateRecipe) {
@@ -946,7 +957,8 @@ function CookContent() {
                     console.error('Failed to parse plate recipe:', e);
                 }
             }
-            router.push('/scan');
+            // No recipe found - go back instead of to scan
+            router.back();
         } else {
             setRecipe(JSON.parse(stored));
         }

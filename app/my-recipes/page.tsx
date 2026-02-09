@@ -164,16 +164,14 @@ export default function MyRecipesPage() {
                     return (
                         <div
                             key={recipe.id}
-                            className={`rounded-2xl overflow-hidden transition-all ${
-                                isExpanded ? 'bg-gray-100' : 'bg-dark-card border border-dark-border'
-                            }`}
+                            className={`rounded-2xl overflow-hidden transition-all ${isExpanded ? 'bg-gray-100' : 'bg-dark-card border border-dark-border'
+                                }`}
                         >
                             {/* Card Header */}
                             <button
                                 onClick={() => setExpandedId(isExpanded ? null : recipe.id)}
-                                className={`w-full p-4 text-left flex items-start justify-between ${
-                                    isExpanded ? 'text-black' : 'text-white'
-                                }`}
+                                className={`w-full p-4 text-left flex items-start justify-between ${isExpanded ? 'text-black' : 'text-white'
+                                    }`}
                             >
                                 <div className="flex-1 min-w-0">
                                     <h3 className="text-lg font-semibold mb-1 truncate">{recipe.title}</h3>
@@ -273,6 +271,12 @@ export default function MyRecipesPage() {
                                         >
                                             <Utensils className="w-4 h-4" />
                                             Cook This
+                                        </button>
+                                        <button
+                                            onClick={() => router.push(`/my-recipes/add?edit=${recipe.id}`)}
+                                            className="w-12 py-3 bg-blue-500 rounded-xl flex items-center justify-center text-white"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" /><path d="m15 5 4 4" /></svg>
                                         </button>
                                         {deleteConfirm === recipe.id ? (
                                             <div className="flex gap-2">

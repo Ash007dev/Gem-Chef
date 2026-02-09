@@ -38,7 +38,8 @@ import {
     needsExpiryDate,
     getWeeklyUsageRate
 } from '@/utils/inventory';
-import { scanBill, fileToBase64, analyzeRecipeFeasibility, RecipeFeasibilityResult } from '@/utils/gemini';
+import { scanBill, fileToBase64, analyzeRecipeFeasibility, RecipeFeasibilityResult, generateRecipes, Recipe } from '@/utils/gemini';
+import { useRouter } from 'next/navigation';
 
 // Categories with icons
 const CATEGORY_ORDER: InventoryItem['category'][] = [
@@ -58,6 +59,7 @@ const CATEGORY_EMOJI: Record<InventoryItem['category'], string> = {
 const UNITS = ['pieces', 'kg', 'g', 'L', 'ml', 'cups', 'tbsp', 'tsp', 'packets', 'bottles', 'cans'];
 
 export default function InventoryPage() {
+    const router = useRouter();
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
     const [showAddSheet, setShowAddSheet] = useState(false);
     const [showScanSheet, setShowScanSheet] = useState(false);
@@ -65,6 +67,11 @@ export default function InventoryPage() {
     const [smartLowStockItems, setSmartLowStockItems] = useState<SmartLowStockItem[]>([]);
     const [expiringItems, setExpiringItems] = useState<InventoryItem[]>([]);
     const [expiredItems, setExpiredItems] = useState<InventoryItem[]>([]);
+
+    // Recipe suggestions based on inventory
+    const [recipeSuggestions, setRecipeSuggestions] = useState<Recipe[]>([]);
+    const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
+    const [showSuggestions, setShowSuggestions] = useState(false);
 
     // Reload inventory from localStorage
     const refreshInventory = () => {
@@ -77,6 +84,26 @@ export default function InventoryPage() {
     useEffect(() => {
         refreshInventory();
     }, []);
+
+    // Generate recipe suggestions from inventory
+    const handleGetSuggestions = async () => {
+        if (inventory.length === 0) return;
+
+        setIsLoadingSuggestions(true);
+        setShowSuggestions(true);
+
+        try {
+            const ingredientsList = inventory.map(item => item.name);
+            const recipes = await generateRecipes(ingredientsList, {
+                dietary: 'both'
+            });
+            setRecipeSuggestions(recipes.slice(0, 6)); // Show top 6 suggestions
+        } catch (error) {
+            console.error('Failed to generate suggestions:', error);
+        } finally {
+            setIsLoadingSuggestions(false);
+        }
+    };
 
     const handleQuantityChange = (id: string, delta: number) => {
         updateItemQuantity(id, delta, 'manual');
@@ -193,6 +220,73 @@ export default function InventoryPage() {
                     <span>Can I Make This Recipe?</span>
                 </button>
             </section>
+
+            {/* Recipe Suggestions Section */}
+            {inventory.length > 0 && (
+                <section className="mb-8">
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 className="text-lg font-semibold text-white">Recipe Ideas</h2>
+                            <p className="text-xs text-gray-500">Based on your inventory</p>
+                        </div>
+                        <button
+                            onClick={handleGetSuggestions}
+                            disabled={isLoadingSuggestions}
+                            className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 rounded-xl text-white font-medium text-sm disabled:opacity-50"
+                        >
+                            {isLoadingSuggestions ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    <span>Thinking...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Sparkles className="w-4 h-4" />
+                                    <span>Suggest</span>
+                                </>
+                            )}
+                        </button>
+                    </div>
+
+                    {/* Recipe Suggestions Grid */}
+                    {showSuggestions && (
+                        <div className="space-y-3">
+                            {isLoadingSuggestions ? (
+                                <div className="text-center py-8">
+                                    <Loader2 className="w-8 h-8 animate-spin text-orange-400 mx-auto mb-2" />
+                                    <p className="text-gray-400 text-sm">Finding recipes you can make...</p>
+                                </div>
+                            ) : recipeSuggestions.length > 0 ? (
+                                <div className="grid grid-cols-2 gap-3">
+                                    {recipeSuggestions.map((recipe, idx) => (
+                                        <button
+                                            key={recipe.id || idx}
+                                            onClick={() => {
+                                                localStorage.setItem('currentRecipe', JSON.stringify(recipe));
+                                                router.push('/cook');
+                                            }}
+                                            className="bg-dark-card border border-dark-border rounded-xl p-4 text-left hover:bg-dark-elevated active:scale-[0.97] transition-all"
+                                        >
+                                            <div className="flex items-start justify-between mb-2">
+                                                <span className="text-2xl">{recipe.type === 'healthy' ? '🥗' : recipe.type === 'quick' ? '⚡' : recipe.type === 'comfort' ? '🍲' : '🍳'}</span>
+                                                <span className="px-2 py-0.5 bg-orange-500/20 rounded-full text-[10px] text-orange-400 font-medium">
+                                                    {recipe.totalTime}
+                                                </span>
+                                            </div>
+                                            <h3 className="text-white font-medium text-sm mb-1 line-clamp-2">{recipe.title}</h3>
+                                            <p className="text-gray-500 text-xs line-clamp-1">{recipe.difficulty} • {recipe.calories}</p>
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-center py-8 bg-dark-card/50 rounded-xl">
+                                    <p className="text-gray-400 text-sm">No suggestions yet. Tap "Suggest" to get recipe ideas!</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </section>
+            )}
 
             {/* Empty State */}
             {inventory.length === 0 && (
