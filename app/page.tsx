@@ -19,6 +19,8 @@ import {
     Zap,
     Timer,
     CookingPot,
+    Calendar,
+    NotebookPen,
     MessageCircle,
 } from 'lucide-react';
 
@@ -231,6 +233,16 @@ export default function LandingPage() {
                         <p className="text-gray-500 text-xs">Photo to full recipe</p>
                     </button>
 
+                    {/* My Recipes */}
+                    <button
+                        onClick={() => router.push('/my-recipes')}
+                        className="bg-dark-card border border-dark-border rounded-xl p-4 text-left hover:bg-dark-elevated active:scale-[0.97] transition-all"
+                    >
+                        <NotebookPen className="w-5 h-5 text-amber-400 mb-3" />
+                        <h4 className="text-white text-sm font-medium mb-0.5">My Recipes</h4>
+                        <p className="text-gray-500 text-xs">Your personal collection</p>
+                    </button>
+
                     {/* Describe to Cook */}
                     <button
                         onClick={() => router.push('/describe')}
@@ -277,6 +289,20 @@ export default function LandingPage() {
                             <p className="text-gray-500 text-xs">Track your progress</p>
                         </div>
                         <ArrowRight className="w-5 h-5 text-gray-600" />
+                    </button>
+
+                    {/* Meal Planner */}
+                    <button
+                        onClick={() => router.push('/meal-planner')}
+                        className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-xl p-4 text-left hover:from-purple-500/30 hover:to-pink-500/30 active:scale-[0.97] transition-all col-span-2"
+                    >
+                        <div className="flex items-center gap-3">
+                            <Calendar className="w-6 h-6 text-purple-400" />
+                            <div>
+                                <h4 className="text-white text-sm font-medium mb-0.5">Meal Planner & Grocery List</h4>
+                                <p className="text-gray-400 text-xs">Plan meals for the week, auto-generate shopping list</p>
+                            </div>
+                        </div>
                     </button>
                 </div>
             </section>

@@ -12,9 +12,188 @@ import {
     Flame,
     Utensils,
     ExternalLink,
-    Play
+    Play,
+    CalendarClock,
+    Bell,
+    X,
+    Check,
+    AlertCircle
 } from 'lucide-react';
 import { generateRecipes, Recipe } from '@/utils/gemini';
+import {
+    addReminder,
+    requestNotificationPermission,
+    formatDuration,
+    getPrepTypeColor
+} from '@/utils/reminders';
+
+// Plan Cook Modal
+function PlanCookModal({
+    recipe,
+    onClose
+}: {
+    recipe: Recipe;
+    onClose: () => void;
+}) {
+    const [selectedDate, setSelectedDate] = useState('');
+    const [selectedTime, setSelectedTime] = useState('');
+    const [remindersSet, setRemindersSet] = useState(false);
+    const [permissionGranted, setPermissionGranted] = useState(false);
+
+    useEffect(() => {
+        // Set default date/time to today + 2 hours
+        const now = new Date();
+        now.setHours(now.getHours() + 2);
+        setSelectedDate(now.toISOString().split('T')[0]);
+        setSelectedTime(now.toTimeString().slice(0, 5));
+
+        // Request notification permission
+        requestNotificationPermission().then(setPermissionGranted);
+    }, []);
+
+    const hasPrep = recipe.prepRequirements && recipe.prepRequirements.length > 0;
+
+    const handleSetReminders = () => {
+        if (!selectedDate || !selectedTime) return;
+
+        const plannedTime = new Date(`${selectedDate}T${selectedTime}`);
+
+        if (hasPrep && recipe.prepRequirements) {
+            recipe.prepRequirements.forEach(prep => {
+                addReminder(recipe, prep, plannedTime);
+            });
+        }
+
+        setRemindersSet(true);
+        setTimeout(() => onClose(), 1500);
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 animate-fade-in">
+            <div className="bg-dark-card rounded-2xl w-full max-w-md border border-dark-border animate-slide-up">
+                {/* Header */}
+                <div className="p-4 border-b border-dark-border flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <CalendarClock className="w-5 h-5 text-purple-400" />
+                        <span className="font-medium text-white">Plan to Cook</span>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 bg-dark-elevated rounded-full flex items-center justify-center">
+                        <X className="w-4 h-4 text-gray-400" />
+                    </button>
+                </div>
+
+                {/* Content */}
+                <div className="p-4">
+                    {remindersSet ? (
+                        <div className="text-center py-8">
+                            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <Check className="w-8 h-8 text-green-400" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-white mb-2">Reminders Set!</h3>
+                            <p className="text-gray-400 text-sm">We'll remind you when it's time to start preparing.</p>
+                        </div>
+                    ) : (
+                        <>
+                            <h3 className="text-lg font-semibold text-white mb-1">{recipe.title}</h3>
+                            <p className="text-gray-500 text-sm mb-4">When do you want to start cooking?</p>
+
+                            {/* Date/Time Picker */}
+                            <div className="space-y-3 mb-4">
+                                <div>
+                                    <label className="text-xs text-gray-500 mb-1 block">Date</label>
+                                    <input
+                                        type="date"
+                                        value={selectedDate}
+                                        onChange={(e) => setSelectedDate(e.target.value)}
+                                        min={new Date().toISOString().split('T')[0]}
+                                        className="w-full p-3 bg-dark-elevated border border-dark-border rounded-xl text-white"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-500 mb-1 block">Time</label>
+                                    <input
+                                        type="time"
+                                        value={selectedTime}
+                                        onChange={(e) => setSelectedTime(e.target.value)}
+                                        className="w-full p-3 bg-dark-elevated border border-dark-border rounded-xl text-white"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Prep Requirements */}
+                            {hasPrep && recipe.prepRequirements && (
+                                <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 mb-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <AlertCircle className="w-4 h-4 text-amber-400" />
+                                        <span className="text-sm font-medium text-amber-400">Advance Prep Required</span>
+                                    </div>
+                                    <div className="space-y-2">
+                                        {recipe.prepRequirements.map((prep, idx) => (
+                                            <div key={idx} className="flex items-center justify-between text-sm">
+                                                <span className="text-gray-300">{prep.description}</span>
+                                                <span className={`px-2 py-0.5 rounded-full text-xs ${getPrepTypeColor(prep.type)}`}>
+                                                    {formatDuration(prep.durationMinutes)}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-2">
+                                        We'll remind you in advance based on prep times.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Notification Warning */}
+                            {!permissionGranted && (
+                                <div className="bg-gray-500/10 border border-gray-500/20 rounded-xl p-3 mb-4">
+                                    <div className="flex items-center gap-2">
+                                        <Bell className="w-4 h-4 text-gray-400" />
+                                        <span className="text-xs text-gray-400">
+                                            Enable notifications to receive prep reminders
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* No Prep Message */}
+                            {!hasPrep && (
+                                <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3 mb-4">
+                                    <div className="flex items-center gap-2">
+                                        <Check className="w-4 h-4 text-green-400" />
+                                        <span className="text-sm text-green-400">No advance prep needed!</span>
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-1">
+                                        This recipe can be started immediately when you're ready.
+                                    </p>
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                {/* Footer */}
+                {!remindersSet && (
+                    <div className="p-4 border-t border-dark-border flex gap-3">
+                        <button
+                            onClick={onClose}
+                            className="flex-1 py-3 bg-dark-elevated border border-dark-border rounded-xl text-white font-medium"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={handleSetReminders}
+                            disabled={!selectedDate || !selectedTime}
+                            className="flex-1 py-3 bg-purple-500 text-white rounded-xl font-medium flex items-center justify-center gap-2 disabled:opacity-50"
+                        >
+                            <Bell className="w-4 h-4" />
+                            {hasPrep ? 'Set Reminders' : 'Schedule'}
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
 
 function RecipesContent() {
     const searchParams = useSearchParams();
@@ -253,6 +432,7 @@ function RecipeCard({
     meal: string;
 }) {
     const [showSteps, setShowSteps] = useState(false);
+    const [showPlanModal, setShowPlanModal] = useState(false);
 
     return (
         <div
@@ -370,6 +550,16 @@ function RecipeCard({
                         </div>
                     )}
 
+                    {/* Prep Requirements Badge */}
+                    {recipe.prepRequirements && recipe.prepRequirements.length > 0 && (
+                        <div className="flex items-center gap-2 mb-4 p-2 bg-amber-50 rounded-lg">
+                            <CalendarClock className="w-4 h-4 text-amber-600" />
+                            <span className="text-xs text-amber-700">
+                                Requires advance prep ({recipe.prepRequirements.map(p => formatDuration(p.durationMinutes)).join(', ')})
+                            </span>
+                        </div>
+                    )}
+
                     {/* YouTube Link */}
                     <a
                         href={youtubeUrl}
@@ -382,12 +572,19 @@ function RecipeCard({
                     </a>
 
                     {/* Action Buttons */}
-                    <div className="flex gap-3">
+                    <div className="flex gap-2">
                         <button
                             onClick={() => setShowSteps(true)}
                             className="flex-1 py-3 bg-gray-200 hover:bg-gray-300 rounded-xl text-black font-medium text-sm transition-colors"
                         >
-                            Read Recipe
+                            Read
+                        </button>
+                        <button
+                            onClick={() => setShowPlanModal(true)}
+                            className="py-3 px-4 bg-purple-100 hover:bg-purple-200 rounded-xl text-purple-700 font-medium text-sm transition-colors flex items-center gap-1"
+                        >
+                            <CalendarClock className="w-4 h-4" />
+                            Plan
                         </button>
                         <button
                             onClick={onCook}
@@ -398,6 +595,14 @@ function RecipeCard({
                         </button>
                     </div>
                 </div>
+            )}
+
+            {/* Plan Cook Modal */}
+            {showPlanModal && (
+                <PlanCookModal
+                    recipe={recipe}
+                    onClose={() => setShowPlanModal(false)}
+                />
             )}
         </div>
     );
