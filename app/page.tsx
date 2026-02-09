@@ -1,356 +1,254 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Camera, Upload, Shuffle, MapPin, Utensils, Leaf, SlidersHorizontal, ChefHat } from 'lucide-react';
-import { identifyIngredients, fileToBase64 } from '@/utils/gemini';
-import PersonalizeSheet from '@/components/PersonalizeSheet';
+import {
+    Camera,
+    BookOpen,
+    Settings,
+    ChefHat,
+    MapPin,
+    Sparkles,
+    Clock,
+    Flame,
+    ArrowRight,
+    Leaf,
+    Utensils,
+    ImageIcon,
+    TrendingUp,
+} from 'lucide-react';
 
-type MealTime = 'Breakfast' | 'Brunch' | 'Lunch' | 'Snack' | 'Dinner';
-type DietaryPref = 'Veg' | 'Non-Veg' | 'Both';
-type CookingStyle = 'Quick & Easy' | 'Restaurant Style' | 'Healthy' | 'Comfort Food';
-
-export default function HomePage() {
+export default function LandingPage() {
     const router = useRouter();
-    const fileInputRef = useRef<HTMLInputElement>(null);
-
-    // Context state
-    const [location, setLocation] = useState('Detecting...');
     const [greeting, setGreeting] = useState('');
+    const [mealSuggestion, setMealSuggestion] = useState('');
+    const [location, setLocation] = useState('');
+    const [dietary, setDietary] = useState('');
+    const [recentCount, setRecentCount] = useState(0);
+    const [mounted, setMounted] = useState(false);
 
-    // Preferences
-    const [mealTime, setMealTime] = useState<MealTime>('Lunch');
-    const [dietary, setDietary] = useState<DietaryPref>('Both');
-    const [cuisine, setCuisine] = useState('Same as Location');
-    const [cookingStyle, setCookingStyle] = useState<CookingStyle>('Quick & Easy');
-    const [showPersonalize, setShowPersonalize] = useState(false);
-
-    // Ingredients
-    const [ingredients, setIngredients] = useState<string[]>([]);
-    const [isScanning, setIsScanning] = useState(false);
-    const [error, setError] = useState('');
-
-    // Get time-based greeting and auto-select meal, load saved preferences
     useEffect(() => {
-        // Time-based meal selection
+        setMounted(true);
+
+        // Time-based greeting & meal suggestion
         const hour = new Date().getHours();
-        if (hour < 10) {
+        if (hour < 6) {
+            setGreeting('Late Night');
+            setMealSuggestion('midnight snack');
+        } else if (hour < 10) {
             setGreeting('Good Morning');
-            setMealTime('Breakfast');
+            setMealSuggestion('breakfast');
         } else if (hour < 12) {
             setGreeting('Good Morning');
-            setMealTime('Brunch');
+            setMealSuggestion('brunch');
         } else if (hour < 15) {
             setGreeting('Good Afternoon');
-            setMealTime('Lunch');
+            setMealSuggestion('lunch');
         } else if (hour < 18) {
             setGreeting('Good Evening');
-            setMealTime('Snack');
+            setMealSuggestion('evening snack');
         } else {
             setGreeting('Good Evening');
-            setMealTime('Dinner');
+            setMealSuggestion('dinner');
         }
 
         // Load saved preferences
         const saved = localStorage.getItem('smartchef_preferences');
         if (saved) {
             const prefs = JSON.parse(saved);
-            if (prefs.dietary) setDietary(prefs.dietary);
             if (prefs.location) setLocation(prefs.location);
+            if (prefs.dietary) setDietary(prefs.dietary);
+        }
+
+        // Count recent cooklog items
+        const cooklog = localStorage.getItem('cooklog');
+        if (cooklog) {
+            const items = JSON.parse(cooklog);
+            setRecentCount(items.length);
         }
     }, []);
 
-    // Get location
-    useEffect(() => {
-        const getLocation = async () => {
-            if (typeof window === 'undefined' || !navigator.geolocation) {
-                setLocation('Your City');
-                return;
-            }
-
-            // Set a timeout for geolocation
-            const timeoutId = setTimeout(() => {
-                setLocation('Your City');
-            }, 5000);
-
-            navigator.geolocation.getCurrentPosition(
-                async (position) => {
-                    clearTimeout(timeoutId);
-                    try {
-                        const { latitude, longitude } = position.coords;
-                        const res = await fetch(
-                            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-                            {
-                                headers: {
-                                    'User-Agent': 'SmartChef App'
-                                }
-                            }
-                        );
-                        const data = await res.json();
-                        const city = data.address?.city ||
-                            data.address?.town ||
-                            data.address?.village ||
-                            data.address?.county ||
-                            '';
-                        const state = data.address?.state || '';
-                        const locationStr = [city, state].filter(Boolean).join(', ') || 'Your City';
-                        setLocation(locationStr);
-                    } catch (err) {
-                        console.error('Location error:', err);
-                        setLocation('Your City');
-                    }
-                },
-                (err) => {
-                    clearTimeout(timeoutId);
-                    console.error('Geolocation error:', err);
-                    setLocation('Your City');
-                },
-                {
-                    enableHighAccuracy: false,
-                    timeout: 5000,
-                    maximumAge: 300000 // Cache for 5 minutes
-                }
-            );
-        };
-
-        getLocation();
-    }, []);
-
-    const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        setIsScanning(true);
-        setError('');
-
-        try {
-            const { base64, mimeType } = await fileToBase64(file);
-            const result = await identifyIngredients(base64, mimeType);
-
-            if (result.ingredients.length > 0) {
-                setIngredients(result.ingredients);
-            } else {
-                setError('No ingredients found. Try another image.');
-            }
-        } catch (err) {
-            setError('Failed to scan. Please try again.');
-            console.error(err);
-        } finally {
-            setIsScanning(false);
-        }
-    };
-
-    const handleGetRecipes = () => {
-        if (ingredients.length === 0) return;
-
-        const params = new URLSearchParams({
-            ingredients: ingredients.join(','),
-            meal: mealTime,
-            dietary: dietary,
-            location: location,
-            style: cookingStyle,
-            cuisine: cuisine,
-        });
-
-        router.push(`/recipes?${params.toString()}`);
-    };
-
-    const mealTimes: MealTime[] = ['Breakfast', 'Brunch', 'Lunch', 'Snack', 'Dinner'];
-    const dietaryOptions: DietaryPref[] = ['Veg', 'Non-Veg', 'Both'];
+    if (!mounted) {
+        return (
+            <div className="min-h-screen bg-black flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            </div>
+        );
+    }
 
     return (
-        <div className="min-h-screen bg-black px-5 pt-12 pb-24">
-            {/* Header */}
-            <header className="mb-8">
-                <h1 className="text-3xl font-bold text-white mb-1">SmartChef</h1>
-                <p className="text-gray-500 text-sm">
-                    What would you like to cook?
-                </p>
+        <div className="min-h-screen bg-black px-5 pt-14 pb-28">
+            {/* Hero */}
+            <header className="mb-10 animate-fade-in">
+                <p className="text-gray-500 text-sm mb-1">{greeting}</p>
+                <h1 className="text-[2rem] font-bold text-white leading-tight mb-3">
+                    What's cooking<br />
+                    <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-pink-400 to-purple-400">
+                        today?
+                    </span>
+                </h1>
+                {location && (
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-dark-card border border-dark-border rounded-full">
+                        <MapPin className="w-3 h-3 text-gray-500" />
+                        <span className="text-xs text-gray-400">{location}</span>
+                    </div>
+                )}
             </header>
 
-            {/* Context Chips */}
-            <div className="flex flex-wrap items-center gap-2 mb-8">
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card rounded-full">
-                    <Utensils className="w-3.5 h-3.5 text-gray-400" />
-                    <span className="text-sm text-white">{mealTime}</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card rounded-full">
-                    <Leaf className="w-3.5 h-3.5 text-gray-400" />
-                    <span className="text-sm text-white">{dietary}</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card rounded-full">
-                    <ChefHat className="w-3.5 h-3.5 text-gray-400" />
-                    <span className="text-sm text-white">{cookingStyle}</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card rounded-full">
-                    <MapPin className="w-3.5 h-3.5 text-gray-400" />
-                    <span className="text-sm text-white">{location}</span>
-                </div>
+            {/* Primary CTA – Scan */}
+            <section className="mb-6 animate-slide-up">
                 <button
-                    onClick={() => setShowPersonalize(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-900/30 border border-indigo-800 rounded-full"
+                    onClick={() => router.push('/scan')}
+                    className="w-full relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500/20 via-pink-500/10 to-purple-600/20 border border-orange-500/20 p-6 text-left group active:scale-[0.98] transition-transform"
                 >
-                    <SlidersHorizontal className="w-3.5 h-3.5 text-indigo-400" />
-                    <span className="text-sm text-indigo-300">Personalize</span>
+                    {/* Glow */}
+                    <div className="absolute -top-12 -right-12 w-40 h-40 bg-orange-500/10 rounded-full blur-3xl group-hover:bg-orange-500/20 transition-colors" />
+
+                    <div className="relative z-10 flex items-start justify-between">
+                        <div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <Camera className="w-5 h-5 text-orange-400" />
+                                <span className="text-xs font-medium text-orange-400 uppercase tracking-wider">
+                                    Scan & Cook
+                                </span>
+                            </div>
+                            <h2 className="text-xl font-semibold text-white mb-1">
+                                Scan your ingredients
+                            </h2>
+                            <p className="text-gray-400 text-sm">
+                                Snap a photo and get personalized {mealSuggestion} recipes
+                            </p>
+                        </div>
+                        <div className="mt-1 w-10 h-10 bg-white/10 rounded-full flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                            <ArrowRight className="w-5 h-5 text-white" />
+                        </div>
+                    </div>
                 </button>
-            </div>
-
-            {/* Meal Time Selector */}
-            <section className="mb-6">
-                <h2 className="text-sm font-medium text-gray-400 mb-3">Meal Time</h2>
-                <div className="flex flex-wrap gap-2">
-                    {mealTimes.map((meal) => (
-                        <button
-                            key={meal}
-                            onClick={() => setMealTime(meal)}
-                            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${mealTime === meal
-                                ? 'bg-white text-black'
-                                : 'bg-dark-card text-gray-400 hover:text-white'
-                                }`}
-                        >
-                            {meal}
-                        </button>
-                    ))}
-                </div>
             </section>
 
-            {/* Dietary Preference */}
-            <section className="mb-8">
-                <h2 className="text-sm font-medium text-gray-400 mb-3">Dietary Preference</h2>
-                <div className="flex flex-wrap gap-2">
-                    {dietaryOptions.map((option) => (
-                        <button
-                            key={option}
-                            onClick={() => setDietary(option)}
-                            className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${dietary === option
-                                ? 'bg-white text-black'
-                                : 'bg-dark-card text-gray-400 hover:text-white'
-                                }`}
-                        >
-                            {option}
-                        </button>
-                    ))}
+            {/* Info Chips */}
+            {dietary && (
+                <div className="flex gap-2 mb-8 animate-fade-in">
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card border border-dark-border rounded-full">
+                        <Leaf className="w-3 h-3 text-green-400" />
+                        <span className="text-xs text-gray-300">{dietary}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 px-3 py-1.5 bg-dark-card border border-dark-border rounded-full">
+                        <Utensils className="w-3 h-3 text-gray-400" />
+                        <span className="text-xs text-gray-300 capitalize">{mealSuggestion}</span>
+                    </div>
                 </div>
-            </section>
+            )}
 
-            {/* Scan Section */}
+            {/* Feature Grid */}
             <section className="mb-8">
-                <h2 className="text-sm font-medium text-gray-400 mb-3">Scan Ingredients</h2>
-
-                <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                />
-
-                <div className="flex gap-3">
+                <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
+                    Explore
+                </h3>
+                <div className="grid grid-cols-2 gap-3">
+                    {/* Cooklog */}
                     <button
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={isScanning}
-                        className="flex-1 flex items-center justify-center gap-2 py-4 bg-dark-card border border-dark-border rounded-xl text-white hover:bg-dark-elevated transition-colors disabled:opacity-50"
+                        onClick={() => router.push('/cooklog')}
+                        className="bg-dark-card border border-dark-border rounded-xl p-4 text-left hover:bg-dark-elevated active:scale-[0.97] transition-all"
                     >
-                        <Camera className="w-5 h-5" strokeWidth={1.5} />
-                        <span className="text-sm font-medium">
-                            {isScanning ? 'Scanning...' : 'Take Photo'}
-                        </span>
+                        <BookOpen className="w-5 h-5 text-blue-400 mb-3" />
+                        <h4 className="text-white text-sm font-medium mb-0.5">Cooklog</h4>
+                        <p className="text-gray-500 text-xs">
+                            {recentCount > 0
+                                ? `${recentCount} dish${recentCount > 1 ? 'es' : ''} cooked`
+                                : 'Your cooking history'}
+                        </p>
                     </button>
 
+                    {/* Preferences */}
                     <button
-                        onClick={() => {
-                            const input = document.createElement('input');
-                            input.type = 'file';
-                            input.accept = 'image/*';
-                            input.onchange = (e) => handleFileSelect(e as unknown as React.ChangeEvent<HTMLInputElement>);
-                            input.click();
-                        }}
-                        disabled={isScanning}
-                        className="flex-1 flex items-center justify-center gap-2 py-4 bg-dark-card border border-dark-border rounded-xl text-white hover:bg-dark-elevated transition-colors disabled:opacity-50"
+                        onClick={() => router.push('/preferences')}
+                        className="bg-dark-card border border-dark-border rounded-xl p-4 text-left hover:bg-dark-elevated active:scale-[0.97] transition-all"
                     >
-                        <Upload className="w-5 h-5" strokeWidth={1.5} />
-                        <span className="text-sm font-medium">Upload</span>
+                        <Settings className="w-5 h-5 text-gray-400 mb-3" />
+                        <h4 className="text-white text-sm font-medium mb-0.5">Settings</h4>
+                        <p className="text-gray-500 text-xs">Diet, cuisine & more</p>
+                    </button>
+
+                    {/* Plate to Recipe */}
+                    <button
+                        onClick={() => router.push('/plate-to-recipe')}
+                        className="bg-dark-card border border-dark-border rounded-xl p-4 text-left hover:bg-dark-elevated active:scale-[0.97] transition-all"
+                    >
+                        <ImageIcon className="w-5 h-5 text-orange-400 mb-3" />
+                        <h4 className="text-white text-sm font-medium mb-0.5">Plate to Recipe</h4>
+                        <p className="text-gray-500 text-xs">Photo to full recipe</p>
+                    </button>
+
+                    {/* Analytics */}
+                    <button
+                        onClick={() => router.push('/analytics')}
+                        className="bg-dark-card border border-dark-border rounded-xl p-4 text-left hover:bg-dark-elevated active:scale-[0.97] transition-all"
+                    >
+                        <TrendingUp className="w-5 h-5 text-green-400 mb-3" />
+                        <h4 className="text-white text-sm font-medium mb-0.5">Analytics</h4>
+                        <p className="text-gray-500 text-xs">Track your progress</p>
                     </button>
                 </div>
-
-                {error && (
-                    <p className="mt-3 text-red-400 text-sm">{error}</p>
-                )}
             </section>
 
-            {/* Ingredients Display */}
-            {ingredients.length > 0 && (
-                <section className="mb-8 animate-fade-in">
-                    <div className="flex items-center justify-between mb-3">
-                        <h2 className="text-sm font-medium text-gray-400">Found Ingredients</h2>
-                        <button
-                            onClick={() => setIngredients([])}
-                            className="text-xs text-gray-500 hover:text-white"
-                        >
-                            Clear
-                        </button>
-                    </div>
-
-                    <div className="flex flex-wrap gap-2">
-                        {ingredients.map((ingredient, idx) => (
-                            <span
-                                key={idx}
-                                className="px-3 py-1.5 bg-dark-card border border-dark-border rounded-full text-sm text-white"
+            {/* How it Works */}
+            <section className="animate-fade-in">
+                <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-4">
+                    How Gem Chef works
+                </h3>
+                <div className="space-y-3">
+                    {[
+                        {
+                            icon: Camera,
+                            color: 'text-orange-400',
+                            bg: 'bg-orange-400/10',
+                            title: 'Scan',
+                            desc: 'Take a photo of your available ingredients',
+                        },
+                        {
+                            icon: Sparkles,
+                            color: 'text-purple-400',
+                            bg: 'bg-purple-400/10',
+                            title: 'Generate',
+                            desc: 'AI creates recipes matching your preferences',
+                        },
+                        {
+                            icon: Flame,
+                            color: 'text-pink-400',
+                            bg: 'bg-pink-400/10',
+                            title: 'Cook',
+                            desc: 'Step-by-step guided cooking with live assist',
+                        },
+                        {
+                            icon: Clock,
+                            color: 'text-blue-400',
+                            bg: 'bg-blue-400/10',
+                            title: 'Track',
+                            desc: 'Your cooklog keeps a record of every dish',
+                        },
+                    ].map((step, i) => {
+                        const Icon = step.icon;
+                        return (
+                            <div
+                                key={step.title}
+                                className="flex items-center gap-4 p-3 bg-dark-card/50 border border-dark-border rounded-xl"
                             >
-                                {ingredient}
-                            </span>
-                        ))}
-                    </div>
-                </section>
-            )}
-
-            {/* Demo Mode */}
-            {ingredients.length === 0 && (
-                <section className="mb-8">
-                    <p className="text-gray-500 text-sm mb-3">Or try with sample ingredients:</p>
-                    <div className="flex flex-wrap gap-2">
-                        {[
-                            { label: 'Italian', items: ['Pasta', 'Tomatoes', 'Basil', 'Garlic', 'Olive Oil'] },
-                            { label: 'Indian', items: ['Rice', 'Dal', 'Onion', 'Tomato', 'Spices'] },
-                            { label: 'Asian', items: ['Rice', 'Soy Sauce', 'Ginger', 'Vegetables'] },
-                        ].map((preset) => (
-                            <button
-                                key={preset.label}
-                                onClick={() => setIngredients(preset.items)}
-                                className="px-3 py-1.5 bg-dark-card border border-dark-border rounded-full text-sm text-gray-400 hover:text-white transition-colors"
-                            >
-                                {preset.label}
-                            </button>
-                        ))}
-                    </div>
-                </section>
-            )}
-
-            {/* Get Recipes Button */}
-            {ingredients.length > 0 && (
-                <button
-                    onClick={handleGetRecipes}
-                    className="w-full py-4 bg-white text-black font-semibold rounded-xl hover:bg-gray-100 transition-colors animate-slide-up"
-                >
-                    Get Recipes
-                </button>
-            )}
-
-            {/* Personalize Sheet */}
-            <PersonalizeSheet
-                isOpen={showPersonalize}
-                onClose={() => setShowPersonalize(false)}
-                onApply={(prefs) => {
-                    setMealTime(prefs.mealTime);
-                    setDietary(prefs.dietary);
-                    setCuisine(prefs.cuisine);
-                    setCookingStyle(prefs.cookingStyle);
-                }}
-                initialMeal={mealTime}
-                initialDietary={dietary}
-                initialStyle={cookingStyle}
-            />
+                                <div className={`w-10 h-10 ${step.bg} rounded-lg flex items-center justify-center flex-shrink-0`}>
+                                    <Icon className={`w-5 h-5 ${step.color}`} />
+                                </div>
+                                <div>
+                                    <p className="text-white text-sm font-medium">
+                                        <span className="text-gray-500 mr-1.5">{i + 1}.</span>
+                                        {step.title}
+                                    </p>
+                                    <p className="text-gray-500 text-xs">{step.desc}</p>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </section>
         </div>
     );
 }

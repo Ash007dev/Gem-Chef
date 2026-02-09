@@ -42,3 +42,6 @@ next-env.d.ts
 *.njsproj
 *.sln
 *.sw?
+
+# Local docs
+FEATURES.md

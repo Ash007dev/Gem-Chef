@@ -1,11 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, RotateCcw, Check, Sparkles, Zap, ChefHat, Heart, Sofa } from 'lucide-react';
+import { X, RotateCcw, Check, Sparkles, Zap, ChefHat, Heart, Sofa, User } from 'lucide-react';
 
 type MealTime = 'Breakfast' | 'Brunch' | 'Lunch' | 'Snack' | 'Dinner';
 type DietaryPref = 'Veg' | 'Non-Veg' | 'Both';
 type CookingStyle = 'Quick & Easy' | 'Restaurant Style' | 'Healthy' | 'Comfort Food';
+type AgeGroup = 'Baby (0-2)' | 'Toddler (2-5)' | 'Kid (5-12)' | 'Teen (13-19)' | 'Adult (20-59)' | 'Senior (60+)';
 
 interface PersonalizeSheetProps {
     isOpen: boolean;
@@ -15,10 +16,12 @@ interface PersonalizeSheetProps {
         dietary: DietaryPref;
         cuisine: string;
         cookingStyle: CookingStyle;
+        ageGroup: AgeGroup;
     }) => void;
     initialMeal?: MealTime;
     initialDietary?: DietaryPref;
     initialStyle?: CookingStyle;
+    initialAgeGroup?: AgeGroup;
 }
 
 const COOKING_STYLES: { value: CookingStyle; icon: typeof Zap; description: string }[] = [
@@ -34,11 +37,13 @@ export default function PersonalizeSheet({
     onApply,
     initialMeal = 'Lunch',
     initialDietary = 'Both',
-    initialStyle = 'Quick & Easy'
+    initialStyle = 'Quick & Easy',
+    initialAgeGroup = 'Adult (20-59)'
 }: PersonalizeSheetProps) {
     const [mealTime, setMealTime] = useState<MealTime>(initialMeal);
     const [dietary, setDietary] = useState<DietaryPref>(initialDietary);
     const [cookingStyle, setCookingStyle] = useState<CookingStyle>(initialStyle);
+    const [ageGroup, setAgeGroup] = useState<AgeGroup>(initialAgeGroup);
     const [useLocationCuisine, setUseLocationCuisine] = useState(true);
     const [customCuisine, setCustomCuisine] = useState('');
 
@@ -49,6 +54,7 @@ export default function PersonalizeSheet({
             const prefs = JSON.parse(saved);
             if (prefs.dietary) setDietary(prefs.dietary);
             if (prefs.cookingStyle) setCookingStyle(prefs.cookingStyle);
+            if (prefs.ageGroup) setAgeGroup(prefs.ageGroup);
             if (prefs.cuisinePreferences?.[mealTime]) {
                 const savedCuisine = prefs.cuisinePreferences[mealTime];
                 if (savedCuisine === 'Same as Location') {
@@ -65,6 +71,7 @@ export default function PersonalizeSheet({
         setMealTime('Lunch');
         setDietary('Both');
         setCookingStyle('Quick & Easy');
+        setAgeGroup('Adult (20-59)');
         setUseLocationCuisine(true);
         setCustomCuisine('');
     };
@@ -77,11 +84,12 @@ export default function PersonalizeSheet({
         const prefs = saved ? JSON.parse(saved) : {};
         prefs.dietary = dietary;
         prefs.cookingStyle = cookingStyle;
+        prefs.ageGroup = ageGroup;
         prefs.cuisinePreferences = prefs.cuisinePreferences || {};
         prefs.cuisinePreferences[mealTime] = cuisine;
         localStorage.setItem('smartchef_preferences', JSON.stringify(prefs));
 
-        onApply({ mealTime, dietary, cuisine, cookingStyle });
+        onApply({ mealTime, dietary, cuisine, cookingStyle, ageGroup });
         onClose();
     };
 
@@ -131,8 +139,8 @@ export default function PersonalizeSheet({
                                     key={style.value}
                                     onClick={() => setCookingStyle(style.value)}
                                     className={`p-3 rounded-xl text-left transition-colors ${cookingStyle === style.value
-                                            ? 'bg-indigo-900/50 border border-indigo-600'
-                                            : 'bg-gray-800/50 border border-gray-700'
+                                        ? 'bg-indigo-900/50 border border-indigo-600'
+                                        : 'bg-gray-800/50 border border-gray-700'
                                         }`}
                                 >
                                     <div className="flex items-center gap-2 mb-1">
@@ -159,8 +167,8 @@ export default function PersonalizeSheet({
                                 key={meal}
                                 onClick={() => setMealTime(meal)}
                                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${mealTime === meal
-                                        ? 'bg-gray-700 text-white'
-                                        : 'bg-gray-800/50 text-gray-400 border border-gray-700'
+                                    ? 'bg-gray-700 text-white'
+                                    : 'bg-gray-800/50 text-gray-400 border border-gray-700'
                                     }`}
                             >
                                 {mealTime === meal && <Check className="w-3 h-3 inline mr-1" />}
@@ -179,11 +187,32 @@ export default function PersonalizeSheet({
                                 key={option}
                                 onClick={() => setDietary(option)}
                                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${dietary === option
-                                        ? 'bg-gray-700 text-white'
-                                        : 'bg-gray-800/50 text-gray-400 border border-gray-700'
+                                    ? 'bg-gray-700 text-white'
+                                    : 'bg-gray-800/50 text-gray-400 border border-gray-700'
                                     }`}
                             >
                                 {dietary === option && <Check className="w-3 h-3 inline mr-1" />}
+                                {option}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Age Group */}
+                <div className="mb-6">
+                    <h3 className="text-white font-medium mb-2">Cooking For</h3>
+                    <p className="text-gray-500 text-xs mb-3">Recipes will be adapted for this age group</p>
+                    <div className="flex flex-wrap gap-2">
+                        {(['Baby (0-2)', 'Toddler (2-5)', 'Kid (5-12)', 'Teen (13-19)', 'Adult (20-59)', 'Senior (60+)'] as AgeGroup[]).map((option) => (
+                            <button
+                                key={option}
+                                onClick={() => setAgeGroup(option)}
+                                className={`px-3 py-2 rounded-full text-sm font-medium transition-colors ${ageGroup === option
+                                    ? 'bg-gray-700 text-white'
+                                    : 'bg-gray-800/50 text-gray-400 border border-gray-700'
+                                    }`}
+                            >
+                                {ageGroup === option && <User className="w-3 h-3 inline mr-1" />}
                                 {option}
                             </button>
                         ))}
@@ -228,7 +257,7 @@ export default function PersonalizeSheet({
                     className="w-full py-4 bg-indigo-900/50 hover:bg-indigo-900/70 border border-indigo-800 rounded-2xl text-white font-medium flex items-center justify-center gap-2 transition-colors"
                 >
                     <Sparkles className="w-4 h-4" />
-                    Rethink Dishes
+                    Let's Cook
                 </button>
             </div>
         </div>

@@ -17,6 +17,7 @@ export interface LiveSessionConfig {
     stepNumber: number;
     totalSteps: number;
     ingredients: string[];
+    voiceLanguage?: string; // User's preferred language for responses
 }
 
 export interface LiveSessionCallbacks {
@@ -65,32 +66,53 @@ export class GeminiLiveSession {
             // Create system instruction for cooking context
             const systemInstruction = this.buildSystemInstruction();
 
-            // Connect to Live API
-            this.session = await this.ai.live.connect({
-                model: 'gemini-2.5-flash-native-audio-preview-12-2025',
-                config: {
-                    responseModalities: [Modality.AUDIO],
-                    systemInstruction: systemInstruction,
-                },
-                callbacks: {
-                    onopen: () => {
-                        console.log('Connected to Gemini Live');
-                        this.isConnected = true;
-                        this.callbacks.onConnected();
-                    },
-                    onmessage: (message: any) => this.handleMessage(message),
-                    onerror: (error: any) => {
-                        console.error('Live API error:', error);
-                        this.callbacks.onError(error.message || 'Connection error');
-                    },
-                    onclose: (event: any) => {
-                        console.log('Disconnected from Gemini Live. Code:', event?.code, 'Reason:', event?.reason);
-                        this.isConnected = false;
-                        this.callbacks.onDisconnected();
-                    },
-                },
-            });
+            // Live API models to try in order
+            const liveModels = [
+                'gemini-2.5-flash-native-audio-preview-12-2025',
+                'gemini-2.0-flash-live-001',
+                'gemini-2.0-flash',
+            ];
 
+            // Try each live model until one connects
+            let connected = false;
+            let lastErr: any = null;
+            for (const liveModel of liveModels) {
+                try {
+                    console.log(`[GemChef Live] Trying ${liveModel}`);
+                    this.session = await this.ai.live.connect({
+                        model: liveModel,
+                        config: {
+                            responseModalities: [Modality.AUDIO],
+                            systemInstruction: systemInstruction,
+                        },
+                        callbacks: {
+                            onopen: () => {
+                                console.log(`Connected to Gemini Live (${liveModel})`);
+                                this.isConnected = true;
+                                this.callbacks.onConnected();
+                            },
+                            onmessage: (message: any) => this.handleMessage(message),
+                            onerror: (error: any) => {
+                                console.error('Live API error:', error);
+                                this.callbacks.onError(error.message || 'Connection error');
+                            },
+                            onclose: (event: any) => {
+                                console.log('Disconnected from Gemini Live. Code:', event?.code, 'Reason:', event?.reason);
+                                this.isConnected = false;
+                                this.callbacks.onDisconnected();
+                            },
+                        },
+                    });
+                    connected = true;
+                    console.log(`[GemChef Live] ✓ ${liveModel} connected`);
+                    break;
+                } catch (err: any) {
+                    console.warn(`[GemChef Live] ✗ ${liveModel} failed:`, err.message);
+                    lastErr = err;
+                }
+            }
+
+            if (!connected) throw lastErr || new Error('All live models failed');
             return true;
         } catch (error: any) {
             console.error('Failed to connect:', error);
@@ -103,6 +125,14 @@ export class GeminiLiveSession {
      * Build system instruction for cooking assistant
      */
     private buildSystemInstruction(): string {
+        const language = this.config.voiceLanguage || 'English';
+        const languageInstruction = language !== 'English'
+            ? `\n\nLANGUAGE REQUIREMENT:\n- ALWAYS respond in ${language}. This is critical.
+- The user prefers ${language}. Speak and respond ONLY in ${language}.
+- You can understand questions in any language, but ALWAYS reply in ${language}.
+- Use natural ${language} expressions and cooking terms where appropriate.`
+            : '';
+
         return `You are SmartChef, a friendly and encouraging AI cooking assistant.
 
 CURRENT CONTEXT:
@@ -110,6 +140,7 @@ CURRENT CONTEXT:
 - Step ${this.config.stepNumber} of ${this.config.totalSteps}
 - Current instruction: ${this.config.currentStep}
 - Ingredients available: ${this.config.ingredients.join(', ')}
+${languageInstruction}
 
 YOUR ROLE:
 1. Watch the user's cooking through the camera feed
@@ -126,7 +157,7 @@ YOUR ROLE:
 COMMUNICATION STYLE:
 - Be warm, friendly, and conversational (not robotic)
 - Keep responses brief (1-2 sentences) unless more detail is needed
-- Use encouraging phrases: "Looking great!", "Perfect!", "Nice technique!"
+- Use encouraging phrases${language !== 'English' ? ` in ${language}` : ''}: "Looking great!", "Perfect!", "Nice technique!"
 - Be patient with beginners - explain things simply if asked
 
 PROACTIVE ALERTS (speak up when you notice):
@@ -135,7 +166,7 @@ PROACTIVE ALERTS (speak up when you notice):
 - "Don't forget to stir!"
 - "Perfect color! Time for the next step"
 
-Start by greeting the user and confirming what step they're on.`;
+Start by greeting the user${language !== 'English' ? ` in ${language}` : ''} and confirming what step they're on.`;
     }
 
     /**
@@ -310,14 +341,22 @@ Start by greeting the user and confirming what step they're on.`;
             this.frameInterval = null;
         }
 
-        // Stop media streams
+        // Stop media streams (audio)
         if (this.mediaStream) {
             this.mediaStream.getTracks().forEach(track => track.stop());
             this.mediaStream = null;
         }
 
-        // Stop video element
+        // Stop video element and its stream
         if (this.videoElement) {
+            // Get and stop all tracks from the video stream
+            const videoStream = this.videoElement.srcObject as MediaStream;
+            if (videoStream) {
+                videoStream.getTracks().forEach(track => {
+                    track.stop();
+                    console.log('[GemChef Live] Stopped video track:', track.kind);
+                });
+            }
             this.videoElement.srcObject = null;
             this.videoElement = null;
         }
