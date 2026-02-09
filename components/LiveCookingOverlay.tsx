@@ -103,7 +103,7 @@ export default function LiveCookingOverlay({
                 }
             },
             onTextResponse: (text) => {
-                addTranscript(`🤖 ${text}`);
+                addTranscript(`Chef: ${text}`);
             },
             onError: (error) => {
                 setConnectionState('error');
@@ -196,9 +196,9 @@ export default function LiveCookingOverlay({
                 <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
                         <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full ${connectionState === 'connected' ? 'bg-green-500/20 text-green-400' :
-                                connectionState === 'connecting' ? 'bg-yellow-500/20 text-yellow-400' :
-                                    connectionState === 'error' ? 'bg-red-500/20 text-red-400' :
-                                        'bg-gray-500/20 text-gray-400'
+                            connectionState === 'connecting' ? 'bg-yellow-500/20 text-yellow-400' :
+                                connectionState === 'error' ? 'bg-red-500/20 text-red-400' :
+                                    'bg-gray-500/20 text-gray-400'
                             }`}>
                             {connectionState === 'connecting' && (
                                 <Loader2 className="w-4 h-4 animate-spin" />
