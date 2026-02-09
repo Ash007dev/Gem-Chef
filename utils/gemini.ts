@@ -225,7 +225,6 @@ export interface Recipe {
         sodium?: number;
         sugar?: number;
     };
-    // Smart Prep Reminders
     prepRequirements?: {
         type: 'marination' | 'soaking' | 'defrosting' | 'resting' | 'chilling' | 'other';
         description: string;
@@ -249,8 +248,10 @@ export async function generateRecipes(
         // Health profile
         healthConditions?: string[];
         allergies?: string[];
-        // Time filter (Quick Cook feature)
+        // Additional options
         maxTime?: number | null;
+        dishName?: string;
+        description?: string;
     } = {}
 ): Promise<Recipe[]> {
     return generateWithFallback(async (modelName) => {
@@ -270,8 +271,7 @@ export async function generateRecipes(
             cuisine = 'Same as Location',
             ageGroup = 'Adult (20-59)',
             healthConditions = [],
-            allergies = [],
-            maxTime = null
+            allergies = []
         } = context;
 
         // Determine the cuisine to use
@@ -455,19 +455,6 @@ export async function generateRecipes(
         - Cooking for age group: ${ageGroup}
         ${ageConstraint}
         ${healthConstraint}
-        ${maxTime ? `
-        *** STRICT TIME CONSTRAINT - QUICK COOK MODE ***
-        The user has ONLY ${maxTime} MINUTES to cook. This is a hard limit.
-        ALL 9 recipes MUST have a total cooking time (prep + cook) of ${maxTime} minutes OR LESS.
-        
-        - For ${maxTime <= 15 ? 'ultra-quick recipes: Focus on no-cook, microwave, or single-pan dishes that can be ready in 15 minutes or less.' :
-                    maxTime <= 30 ? 'quick recipes: Focus on simple preparations, minimal steps, quick-cooking ingredients.' :
-                        maxTime <= 45 ? 'moderate recipes: Allow for slightly more complex preparations, but still efficient cooking methods.' :
-                            'standard recipes: Full recipes are acceptable, but avoid slow-cooking or multi-hour preparations.'}
-        
-        The "time" field in the JSON must be "${maxTime} min" or less for EVERY recipe.
-        If a dish traditionally takes longer, suggest a quick version or alternative.
-        ` : ''}
         ${effectiveCuisine ? `- Cuisine/Region: ${effectiveCuisine}` : ''}
         
         ${dietary === 'Veg' ? `*** EXTREMELY IMPORTANT DIETARY CONSTRAINT ***
@@ -550,17 +537,9 @@ export async function generateRecipes(
               "Step 3: Add the mustard seeds. They will start to pop and splutter within 10-15 seconds. Cover with a lid to prevent splattering. Once the popping slows down, proceed to the next step.",
               "...continue with equally detailed steps..."
             ],
-            "mealPrep": ["Can be stored in refrigerator for 3 days", "Reheat in microwave for 2 minutes"],
-            "prepRequirements": [
-              {
-                "type": "marination" | "soaking" | "defrosting" | "resting" | "chilling" | "other",
-                "description": "Marinate chicken in yogurt and spices",
-                "durationMinutes": 240
-              }
-            ]
+            "mealPrep": ["Can be stored in refrigerator for 3 days", "Reheat in microwave for 2 minutes"]
           }
         ]
-        NOTE: prepRequirements is optional - only include if the recipe requires advance preparation. Most quick recipes won't have this.
         `;
 
         const result = await model.generateContent(prompt);
@@ -704,13 +683,333 @@ export async function getCookingTip(
     }, 'getCookingTip');
 }
 
+export interface BillScanResult {
+    items: {
+        name: string;
+        quantity: string;
+        category?: string;
+    }[];
+}
+
 /**
- * Substitution Genius: Get substitute suggestions for a missing ingredient
+ * Scans a grocery bill/receipt image and extracts food items
+ * Uses Gemini Vision to understand the receipt and parse items
  */
+export async function scanBill(
+    imageBase64: string,
+    mimeType: string = 'image/jpeg'
+): Promise<BillScanResult> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `
+        You are an expert OCR system specialized in reading grocery receipts and bills.
+        
+        STEP 1: CAREFULLY READ THE ENTIRE RECEIPT
+        - Look at every line item in the receipt
+        - Pay special attention to tabular data with columns (Sr.No, Name, Qty, Rate, Total)
+        - Read text even if slightly blurry or at an angle
+        - Look for item descriptions in the "Name of Product/Service" or similar column
+        
+        STEP 2: EXTRACT ALL FOOD AND GROCERY ITEMS
+        Food items include:
+        - Cooking oils (sunflower oil, olive oil, mustard oil, etc.)
+        - Cereals & breakfast items (corn flakes, oats, muesli, etc.)
+        - Dairy products (milk, butter, cheese, yogurt, ghee, paneer)
+        - Grains & pulses (rice, wheat, flour, dal, lentils, beans)
+        - Vegetables & fruits (fresh or packaged)
+        - Spices & condiments (salt, sugar, turmeric, masalas, sauces)
+        - Beverages (tea, coffee, juice, soft drinks)
+        - Meat, fish, eggs
+        - Bread, biscuits, snacks
+        - Packaged foods (noodles, pasta, ready-to-eat meals)
+        
+        DO NOT INCLUDE (filter these out):
+        - Household items (detergent, soap, cleaning supplies)
+        - Personal care (shampoo, toothpaste)
+        - Bags, containers, packaging
+        - Non-grocery items (backpacks, stationery, electronics)
+        - Tax, discounts, totals, subtotals
+        - Service charges
+        
+        STEP 3: FORMAT EACH ITEM
+        - Normalize names: "KELLOGGS CORN FLAKES" → "Corn Flakes"
+        - Extract quantity from Qty column (e.g., "1 KGS", "1 LTR", "2 pcs")
+        - Assign category: Produce, Dairy, Proteins, Pantry, Spices, Beverages, Other
+        
+        Return ONLY valid JSON in this exact format:
+        {
+            "items": [
+                {"name": "Clean Item Name", "quantity": "amount with unit", "category": "Category"}
+            ]
+        }
+        
+        IMPORTANT: Read EVERY row in the receipt table carefully. Don't miss any food items.
+        If no food items found, return: {"items": []}
+        `;
+
+        const imagePart = {
+            inlineData: {
+                data: imageBase64,
+                mimeType
+            }
+        };
+
+        const result = await model.generateContent([prompt, imagePart]);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            return JSON.parse(text) as BillScanResult;
+        } catch (e) {
+            console.error("Failed to parse bill scan JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'scanBill');
+}
+
+// =============================================================================
+// RECIPE FEASIBILITY CHECKER
+// =============================================================================
+
+export interface RecipeFeasibilityResult {
+    canMake: boolean;
+    recipeName: string;
+    availableIngredients: string[];
+    missingIngredients: string[];
+    partialMatch: boolean; // true if some ingredients available
+    recipe?: {
+        title: string;
+        description: string;
+        prepTime: string;
+        cookTime: string;
+        servings: string;
+        difficulty: string;
+        ingredients: string[];
+        steps: string[];
+        tips?: string[];
+    };
+    suggestion?: string; // Alternative suggestion if can't make
+}
+
+/**
+ * Analyzes if a recipe can be made with available inventory items
+ * If yes: returns full recipe with steps
+ * If no: returns missing ingredients list
+ */
+export async function analyzeRecipeFeasibility(
+    recipeName: string,
+    inventoryItems: string[]
+): Promise<RecipeFeasibilityResult> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `
+        You are a culinary expert analyzing if a recipe can be made with available ingredients.
+        
+        RECIPE REQUESTED: "${recipeName}"
+        
+        AVAILABLE INVENTORY:
+        ${inventoryItems.length > 0 ? inventoryItems.join(', ') : 'Empty inventory'}
+        
+        TASK:
+        1. Identify ALL ingredients needed for "${recipeName}"
+        2. Compare against the available inventory
+        3. Determine if the recipe CAN be made (70% or more essential ingredients available)
+        
+        RESPONSE RULES:
+        - Be flexible with ingredient matching (e.g., "tomatoes" matches "tomato", "onion" matches "onions")
+        - Consider common pantry staples (salt, pepper, oil, water) as available unless the inventory is completely empty
+        - For missing ingredients, only list ESSENTIAL ones (not garnishes or optional items)
+        
+        Return JSON in this EXACT format:
+        {
+            "canMake": true/false,
+            "recipeName": "Exact Recipe Name",
+            "availableIngredients": ["ingredient1", "ingredient2"],
+            "missingIngredients": ["missing1", "missing2"],
+            "partialMatch": true/false,
+            "recipe": {
+                "title": "Recipe Title",
+                "description": "Brief appetizing description",
+                "prepTime": "15 mins",
+                "cookTime": "30 mins",
+                "servings": "4",
+                "difficulty": "Easy/Medium/Hard",
+                "ingredients": ["1 cup rice", "2 tomatoes", ...],
+                "steps": ["Step 1: ...", "Step 2: ...", ...],
+                "tips": ["Optional tip 1", "Optional tip 2"]
+            },
+            "suggestion": "If can't make, suggest what to buy or alternative recipe"
+        }
+        
+        IMPORTANT:
+        - If canMake is TRUE, include the full recipe object
+        - If canMake is FALSE, recipe can be null/omitted, but include helpful suggestion
+        - partialMatch is TRUE if user has at least some ingredients (even if not enough to make the full recipe)
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            return JSON.parse(text) as RecipeFeasibilityResult;
+        } catch (e) {
+            console.error("Failed to parse recipe feasibility JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'analyzeRecipeFeasibility');
+}
+
+// =============================================================================
+// DISH IDENTIFICATION
+// =============================================================================
+
+export interface DishIdentity {
+    dishName: string;
+    cuisine: string;
+    description: string;
+    confidence: string;
+}
+
+/**
+ * Identifies a dish from an image using Gemini Vision
+ */
+export async function identifyDish(
+    imageBase64: string,
+    mimeType: string = 'image/jpeg'
+): Promise<DishIdentity> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `
+        Identify this specific dish.
+        Analyze the visual appearance, ingredients, and presentation.
+        
+        Return JSON:
+        {
+            "dishName": "Name of the dish (e.g. Penne Rosa, Butter Chicken)",
+            "cuisine": "Cuisine origin (e.g. Italian, Indian)",
+            "description": "Brief description of what is widely known about this dish",
+            "confidence": "High" | "Medium" | "Low"
+        }
+        `;
+
+        const imagePart = {
+            inlineData: {
+                data: imageBase64,
+                mimeType
+            }
+        };
+
+        const result = await model.generateContent([prompt, imagePart]);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            return JSON.parse(text) as DishIdentity;
+        } catch (e) {
+            console.error("Failed to parse dish identity JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'identifyDish');
+}
+
+/**
+ * Identifies a dish directly from a text description
+ */
+export async function identifyDishFromText(
+    description: string
+): Promise<DishIdentity> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `
+        Identify the dish described here: "${description}"
+        
+        Return JSON:
+        {
+            "dishName": "Name of the dish (e.g. Penne Rosa, Butter Chicken)",
+            "cuisine": "Cuisine origin (e.g. Italian, Indian)",
+            "description": "Brief description of the dish",
+            "confidence": "High" | "Medium" | "Low"
+        }
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            return JSON.parse(text) as DishIdentity;
+        } catch (e) {
+            console.error("Failed to parse dish identity JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'identifyDishFromText');
+}
+
+/**
+ * Generates an image of a dish based on description using Imagen 3.0
+ */
+export async function generateDishImage(description: string): Promise<string> {
+    const apiKey = API_KEYS[currentKeyIndex];
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${apiKey}`;
+
+    const payload = {
+        instances: [
+            { prompt: `Professional food photography, close-up, high quality: ${description}` }
+        ],
+        parameters: {
+            sampleCount: 1,
+            aspectRatio: "1:1",
+            outputOptions: { mimeType: "image/jpeg" }
+        }
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            throw new Error(`Imagen API error: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (data.predictions && data.predictions[0]?.bytesBase64Encoded) {
+            return `data:image/jpeg;base64,${data.predictions[0].bytesBase64Encoded}`;
+        }
+        throw new Error('No image generated');
+    } catch (error) {
+        console.error('Image generation failed:', error);
+        throw error;
+    }
+}
+
+// =============================================================================
+// INGREDIENT SUBSTITUTIONS
+// =============================================================================
+
 export interface IngredientSubstitute {
     name: string;
-    ratio: string;           // e.g., "1:1", "2 tbsp for 1 tbsp"
-    notes: string;           // Brief explanation
+    ratio: string;
+    notes: string;
     type: 'common' | 'dietary' | 'creative';
 }
 
@@ -750,17 +1049,7 @@ export async function getIngredientSubstitutes(
         ${dietaryRestrictions.length > 0 ? `Dietary restrictions: ${dietaryRestrictions.join(', ')}` : ''}
         ${allergies.length > 0 ? `ALLERGIES (CRITICAL - never suggest these): ${allergies.join(', ')}` : ''}
         
-        Provide 3-5 substitute options. For each substitute:
-        1. name: The substitute ingredient
-        2. ratio: Exact conversion (e.g., "1:1 replacement" or "2 tbsp yogurt for 1 tbsp cream")
-        3. notes: Brief tip on how it changes the dish (max 15 words)
-        4. type: 
-           - "common" = easily found at home
-           - "dietary" = healthier or addresses dietary needs
-           - "creative" = unexpected but works well
-        
-        Order by practicality (most likely to have at home first).
-        If no good substitutes exist, explain why in noSubstituteReason.
+        Provide 3-5 substitute options.
         
         Return JSON:
         {
@@ -790,9 +1079,67 @@ export async function getIngredientSubstitutes(
     }, 'getIngredientSubstitutes');
 }
 
-/**
- * Meal Planner: Generate meal suggestions for a specific meal type
- */
+// =============================================================================
+// GOURMET TRANSFORMATIONS
+// =============================================================================
+
+export async function generateGourmetTransformations(
+    basicIngredients: string,
+    category: string = 'General'
+): Promise<Recipe[]> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `
+        You are a creative chef specializing in "Gourmet Hacks".
+
+        User has: "${basicIngredients}"
+        Category: ${category}
+
+        Generate 3-4 CREATIVE transformation recipes.
+
+        Return JSON array:
+        [
+          {
+            "id": "unique-id",
+            "title": "Creative Recipe Name",
+            "description": "Appetizing description",
+            "prepTime": "5 min",
+            "cookTime": "10 min",
+            "totalTime": "15 min",
+            "servings": "1-2",
+            "difficulty": "Easy" | "Medium" | "Hard",
+            "calories": "Estimated calories",
+            "type": "fusion",
+            "ingredients": {
+              "provided": ["ingredients used"],
+              "shoppingList": ["extra items needed"]
+            },
+            "steps": ["Step 1", "Step 2..."]
+          }
+        ]
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            return JSON.parse(text) as Recipe[];
+        } catch (e) {
+            console.error("Failed to parse gourmet recipes JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'generateGourmetTransformations');
+}
+
+// =============================================================================
+// MEAL PLANNING
+// =============================================================================
+
 export interface MealSuggestion {
     id: string;
     title: string;
@@ -807,64 +1154,43 @@ export interface MealSuggestion {
 }
 
 export async function generateMealSuggestions(
-    mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'brunch',
-    context: {
-        cuisine?: string;
+    mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack',
+    preferences: {
         dietary?: string;
-        healthConditions?: string[];
-        allergies?: string[];
-        previousMeals?: string[];  // Avoid repetition
+        cuisinePreference?: string;
+        quickMeals?: boolean;
+        availableIngredients?: string[];
     } = {}
 ): Promise<MealSuggestion[]> {
     return generateWithFallback(async (modelName) => {
         const model = genAI.getGenerativeModel({
             model: modelName,
-            generationConfig: {
-                responseMimeType: "application/json",
-                temperature: 0.8
-            }
+            generationConfig: { responseMimeType: "application/json" }
         });
 
-        const { cuisine = '', dietary = 'both', healthConditions = [], allergies = [], previousMeals = [] } = context;
-
-        const mealTypeInstructions: Record<string, string> = {
-            breakfast: 'Light to moderate morning meals. Include options like: idli/dosa, parathas, eggs, smoothie bowls, poha, upma, oats, pancakes, toast varieties.',
-            lunch: 'Fulfilling midday meals. Include options like: rice with curry, dal-rice, biryani, pasta, sandwiches, wraps, salads, noodles.',
-            dinner: 'Satisfying evening meals. Include options like: chapati with sabzi, rice dishes, soups, stir-fries, grilled items, lighter curries.',
-            snack: 'Quick bites and tea-time snacks. Include: samosas, pakoras, sandwiches, fruits, chaat, cookies, energy balls, quick bites.',
-            brunch: 'Late morning substantial meals. Include: eggs benedict, French toast, smoothie bowls, avocado toast, pancake stacks, shakshuka.'
-        };
+        const { dietary, cuisinePreference, quickMeals, availableIngredients } = preferences;
 
         const prompt = `
-        You are a meal planner AI. Generate 5 ${mealType.toUpperCase()} suggestions.
+        Generate 4-6 ${mealType} suggestions.
         
-        ${mealTypeInstructions[mealType]}
-        
-        ${cuisine ? `Cuisine preference: ${cuisine}` : 'Mix of cuisines appropriate for the meal type'}
-        ${dietary === 'Veg' ? 'VEGETARIAN ONLY - No meat, fish, or eggs' : ''}
-        ${healthConditions.length > 0 ? `Health conditions to consider: ${healthConditions.join(', ')}` : ''}
-        ${allergies.length > 0 ? `ALLERGIES - NEVER suggest these: ${allergies.join(', ')}` : ''}
-        ${previousMeals.length > 0 ? `Avoid these (already planned): ${previousMeals.join(', ')}` : ''}
-        
-        Requirements:
-        - Suggest 5 varied options for ${mealType}
-        - Include a mix of quick (under 30 min) and regular options
-        - Provide practical, home-cookable recipes
-        - Be specific with dish names
-        
+        ${dietary ? `Dietary: ${dietary}` : ''}
+        ${cuisinePreference ? `Cuisine: ${cuisinePreference}` : ''}
+        ${quickMeals ? 'Quick meals under 30 min' : ''}
+        ${availableIngredients?.length ? `Ingredients: ${availableIngredients.join(', ')}` : ''}
+
         Return JSON array:
         [
             {
-                "id": "unique-id",
-                "title": "Dish Name",
-                "description": "One line appetizing description",
+                "id": "id",
+                "title": "Meal Name",
+                "description": "Description",
                 "prepTime": "10 min",
-                "cookTime": "20 min", 
+                "cookTime": "20 min",
                 "totalTime": "30 min",
                 "calories": "280 kcal",
                 "difficulty": "Easy" | "Medium" | "Hard",
-                "ingredients": ["ingredient 1", "ingredient 2", "..."],
-                "isQuick": true or false (true if under 30 min total)
+                "ingredients": ["ingredient 1", "ingredient 2"],
+                "isQuick": true or false
             }
         ]
         `;
@@ -884,9 +1210,10 @@ export async function generateMealSuggestions(
     }, 'generateMealSuggestions');
 }
 
-/**
- * Generate aggregated grocery list from planned meals
- */
+// =============================================================================
+// GROCERY LIST
+// =============================================================================
+
 export interface GroceryItem {
     name: string;
     category: 'produce' | 'dairy' | 'protein' | 'grains' | 'spices' | 'other';
@@ -912,21 +1239,11 @@ export async function generateGroceryList(
             }
         });
 
-        const allIngredients = plannedMeals.flatMap(m =>
-            m.ingredients.map(i => ({ ingredient: i, recipe: m.title }))
-        );
-
         const prompt = `
-        You are a smart grocery list optimizer. Given these planned meals and their ingredients, create an optimized shopping list.
+        Create optimized shopping list from planned meals.
         
-        PLANNED MEALS:
+        MEALS:
         ${plannedMeals.map(m => `- ${m.title}: ${m.ingredients.join(', ')}`).join('\n')}
-        
-        TASKS:
-        1. AGGREGATE similar ingredients (e.g., "2 onions" + "1 onion" = "3 onions")
-        2. CATEGORIZE each item into: produce, dairy, protein, grains, spices, other
-        3. STANDARDIZE quantities where possible
-        4. TRACK which recipes need each ingredient
         
         Return JSON:
         {
@@ -935,19 +1252,11 @@ export async function generateGroceryList(
                     "name": "Onions",
                     "category": "produce",
                     "quantity": "6 medium",
-                    "forRecipes": ["Pasta Sauce", "Curry", "Stir Fry"]
+                    "forRecipes": ["Pasta", "Curry"]
                 }
             ],
             "totalRecipes": ${plannedMeals.length}
         }
-        
-        Categories:
-        - produce: vegetables, fruits, herbs
-        - dairy: milk, cheese, butter, yogurt, cream
-        - protein: meat, fish, eggs, tofu, paneer, legumes
-        - grains: rice, flour, pasta, bread, oats
-        - spices: spices, seasonings, oils, sauces
-        - other: everything else
         `;
 
         const result = await model.generateContent(prompt);
@@ -962,9 +1271,73 @@ export async function generateGroceryList(
         }
     }, 'generateGroceryList');
 }
-/**
- * User-Submitted Recipe interface (personal collection)
- */
+
+// =============================================================================
+// VIDEO RECIPE SUMMARY
+// =============================================================================
+
+export interface VideoSyncedRecipe {
+    title: string;
+    description: string;
+    totalTime: string;
+    ingredients: string[];
+    steps: {
+        instruction: string;
+        explanation: string;
+    }[];
+}
+
+export async function generateVideoRecipe(
+    videoTitleOrUrl: string
+): Promise<VideoSyncedRecipe> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `
+        Summary of cooking video: "${videoTitleOrUrl}"
+        
+        Create a RECIPE SUMMARY. Requirements:
+        1. List all ingredients
+        2. Clear logical steps
+        3. Brief explanation per step
+        4. Estimate total time
+        
+        Return JSON:
+        {
+            "title": "Recipe Title",
+            "description": "Brief description",
+            "totalTime": "45 mins",
+            "ingredients": ["ingredient list"],
+            "steps": [
+                {
+                    "instruction": "Step 1",
+                    "explanation": "Details..."
+                }
+            ]
+        }
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            return JSON.parse(cleanedText) as VideoSyncedRecipe;
+        } catch (e) {
+            console.error("Failed to parse video recipe JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'generateVideoRecipe');
+}
+
+// =============================================================================
+// USER RECIPES
+// =============================================================================
+
 export interface UserRecipe {
     id: string;
     title: string;
@@ -975,15 +1348,11 @@ export interface UserRecipe {
     difficulty: 'Easy' | 'Medium' | 'Hard';
     ingredients: string[];
     steps: string[];
-    photo?: string; // base64 data URL
+    photo?: string;
     createdAt: string;
     source: 'manual' | 'voice' | 'text-import';
 }
 
-/**
- * Parses unstructured text (WhatsApp message, notes, voice transcript)
- * into a structured UserRecipe using Gemini AI
- */
 export async function parseRecipeText(rawText: string): Promise<Omit<UserRecipe, 'id' | 'createdAt' | 'source' | 'photo'>> {
     return generateWithFallback(async (modelName) => {
         const model = genAI.getGenerativeModel({
@@ -991,31 +1360,23 @@ export async function parseRecipeText(rawText: string): Promise<Omit<UserRecipe,
             generationConfig: { responseMimeType: "application/json" }
         });
 
-        const prompt = `You are a recipe parser. The user has provided unstructured text that describes a recipe. Parse it into a structured format.
+        const prompt = `Parse this recipe text into structured format:
 
-Input text:
 """
 ${rawText}
 """
 
-Return valid JSON in this exact format:
+Return JSON:
 {
   "title": "Recipe name",
-  "description": "A short 1-sentence description of the dish",
-  "servings": "e.g. 4 servings",
-  "prepTime": "e.g. 15 min",
-  "cookTime": "e.g. 30 min",
+  "description": "Short description",
+  "servings": "4 servings",
+  "prepTime": "15 min",
+  "cookTime": "30 min",
   "difficulty": "Easy" | "Medium" | "Hard",
-  "ingredients": ["ingredient 1 with quantity", "ingredient 2 with quantity", ...],
-  "steps": ["Step 1 instruction", "Step 2 instruction", ...]
-}
-
-Rules:
-- Extract all ingredients with their quantities if mentioned
-- Break instructions into clear numbered steps
-- If servings/time are not mentioned, make a reasonable estimate
-- Keep the original language/style but make it clear and structured
-- If the text is very minimal, fill in reasonable defaults`;
+  "ingredients": ["ingredient 1", "ingredient 2"],
+  "steps": ["Step 1", "Step 2"]
+}`;
 
         const result = await model.generateContent(prompt);
         const response = await result.response;

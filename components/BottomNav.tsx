@@ -2,11 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Camera, BookOpen, Settings, Activity } from 'lucide-react';
+import { Home, Camera, Package, BookOpen, Settings, Activity } from 'lucide-react';
 
 const navItems = [
     { href: '/', label: 'Home', icon: Home },
     { href: '/scan', label: 'Scan', icon: Camera },
+    { href: '/inventory', label: 'Inventory', icon: Package },
     { href: '/nutrition', label: 'Nutrition', icon: Activity },
     { href: '/cooklog', label: 'Cooklog', icon: BookOpen },
     { href: '/preferences', label: 'Settings', icon: Settings },

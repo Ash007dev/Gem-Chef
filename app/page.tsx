@@ -22,6 +22,7 @@ import {
     Calendar,
     NotebookPen,
     Globe,
+    MessageCircle,
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -99,6 +100,22 @@ export default function LandingPage() {
                         <span className="text-xs text-gray-400">{location}</span>
                     </div>
                 )}
+
+                {/* Secondary Action - Describe */}
+                <div className="mt-6 flex gap-3">
+                    <button
+                        onClick={() => router.push('/describe')}
+                        className="flex-1 py-3 px-4 bg-dark-card border border-dark-border rounded-xl flex items-center justify-center gap-2 active:scale-95 transition-all group"
+                    >
+                        <div className="w-8 h-8 rounded-full bg-pink-500/10 flex items-center justify-center group-hover:bg-pink-500/20 transition-colors">
+                            <MessageCircle className="w-4 h-4 text-pink-400" />
+                        </div>
+                        <div className="text-left">
+                            <p className="text-xs text-gray-400 font-medium">Have a memory?</p>
+                            <p className="text-sm text-white font-semibold">Describe Dish</p>
+                        </div>
+                    </button>
+                </div>
             </header>
 
             {/* Primary CTA – Scan */}
@@ -237,14 +254,52 @@ export default function LandingPage() {
                         <p className="text-gray-500 text-xs">Your personal collection</p>
                     </button>
 
+                    {/* Describe to Cook */}
+                    <button
+                        onClick={() => router.push('/describe')}
+                        className="bg-dark-card border border-dark-border rounded-xl p-4 text-left hover:bg-dark-elevated active:scale-[0.97] transition-all"
+                    >
+                        <MessageCircle className="w-5 h-5 text-pink-400 mb-3" />
+                        <h4 className="text-white text-sm font-medium mb-0.5">Describe View</h4>
+                        <p className="text-gray-500 text-xs">Memory to recipe</p>
+                    </button>
+
+                    {/* Basic to Gourmet */}
+                    <button
+                        onClick={() => router.push('/gourmet')}
+                        className="col-span-2 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border border-yellow-500/20 rounded-xl p-4 text-left hover:bg-dark-elevated active:scale-[0.97] transition-all"
+                    >
+                        <ChefHat className="w-5 h-5 text-yellow-400 mb-3" />
+                        <h4 className="text-white text-sm font-medium mb-0.5">Basic to Gourmet</h4>
+                        <p className="text-gray-400 text-xs">Transform lazy ingredients into luxury meals</p>
+                    </button>
+
+                    {/* Cook-Along (Video Sync) */}
+                    <button
+                        onClick={() => router.push('/cook-along')}
+                        className="col-span-2 bg-gradient-to-r from-red-500/10 to-pink-500/10 border border-red-500/20 rounded-xl p-4 text-left hover:bg-dark-elevated active:scale-[0.97] transition-all"
+                    >
+                        <div className="flex justify-between items-start">
+                            <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center mb-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            </div>
+                            <span className="bg-red-500/20 text-red-300 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">New</span>
+                        </div>
+                        <h4 className="text-white text-sm font-medium mb-0.5">Video to Recipe</h4>
+                        <p className="text-gray-400 text-xs">Summarize any cooking video instantly</p>
+                    </button>
+
                     {/* Analytics */}
                     <button
                         onClick={() => router.push('/analytics')}
-                        className="bg-dark-card border border-dark-border rounded-xl p-4 text-left hover:bg-dark-elevated active:scale-[0.97] transition-all"
+                        className="col-span-2 bg-dark-card border border-dark-border rounded-xl p-4 text-left hover:bg-dark-elevated active:scale-[0.97] transition-all flex items-center justify-between"
                     >
-                        <TrendingUp className="w-5 h-5 text-green-400 mb-3" />
-                        <h4 className="text-white text-sm font-medium mb-0.5">Analytics</h4>
-                        <p className="text-gray-500 text-xs">Track your progress</p>
+                        <div>
+                            <TrendingUp className="w-5 h-5 text-green-400 mb-3" />
+                            <h4 className="text-white text-sm font-medium mb-0.5">Analytics</h4>
+                            <p className="text-gray-500 text-xs">Track your progress</p>
+                        </div>
+                        <ArrowRight className="w-5 h-5 text-gray-600" />
                     </button>
 
                     {/* Meal Planner */}
