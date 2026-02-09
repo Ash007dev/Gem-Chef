@@ -19,6 +19,7 @@ import {
     Zap,
     Timer,
     CookingPot,
+    Calendar,
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -222,6 +223,20 @@ export default function LandingPage() {
                         <TrendingUp className="w-5 h-5 text-green-400 mb-3" />
                         <h4 className="text-white text-sm font-medium mb-0.5">Analytics</h4>
                         <p className="text-gray-500 text-xs">Track your progress</p>
+                    </button>
+
+                    {/* Meal Planner */}
+                    <button
+                        onClick={() => router.push('/meal-planner')}
+                        className="bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-xl p-4 text-left hover:from-purple-500/30 hover:to-pink-500/30 active:scale-[0.97] transition-all col-span-2"
+                    >
+                        <div className="flex items-center gap-3">
+                            <Calendar className="w-6 h-6 text-purple-400" />
+                            <div>
+                                <h4 className="text-white text-sm font-medium mb-0.5">Meal Planner & Grocery List</h4>
+                                <p className="text-gray-400 text-xs">Plan meals for the week, auto-generate shopping list</p>
+                            </div>
+                        </div>
                     </button>
                 </div>
             </section>

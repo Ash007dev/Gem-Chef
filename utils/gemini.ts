@@ -774,3 +774,175 @@ export async function getIngredientSubstitutes(
     }, 'getIngredientSubstitutes');
 }
 
+/**
+ * Meal Planner: Generate meal suggestions for a specific meal type
+ */
+export interface MealSuggestion {
+    id: string;
+    title: string;
+    description: string;
+    prepTime: string;
+    cookTime: string;
+    totalTime: string;
+    calories: string;
+    difficulty: 'Easy' | 'Medium' | 'Hard';
+    ingredients: string[];
+    isQuick: boolean;
+}
+
+export async function generateMealSuggestions(
+    mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'brunch',
+    context: {
+        cuisine?: string;
+        dietary?: string;
+        healthConditions?: string[];
+        allergies?: string[];
+        previousMeals?: string[];  // Avoid repetition
+    } = {}
+): Promise<MealSuggestion[]> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: {
+                responseMimeType: "application/json",
+                temperature: 0.8
+            }
+        });
+
+        const { cuisine = '', dietary = 'both', healthConditions = [], allergies = [], previousMeals = [] } = context;
+
+        const mealTypeInstructions: Record<string, string> = {
+            breakfast: 'Light to moderate morning meals. Include options like: idli/dosa, parathas, eggs, smoothie bowls, poha, upma, oats, pancakes, toast varieties.',
+            lunch: 'Fulfilling midday meals. Include options like: rice with curry, dal-rice, biryani, pasta, sandwiches, wraps, salads, noodles.',
+            dinner: 'Satisfying evening meals. Include options like: chapati with sabzi, rice dishes, soups, stir-fries, grilled items, lighter curries.',
+            snack: 'Quick bites and tea-time snacks. Include: samosas, pakoras, sandwiches, fruits, chaat, cookies, energy balls, quick bites.',
+            brunch: 'Late morning substantial meals. Include: eggs benedict, French toast, smoothie bowls, avocado toast, pancake stacks, shakshuka.'
+        };
+
+        const prompt = `
+        You are a meal planner AI. Generate 5 ${mealType.toUpperCase()} suggestions.
+        
+        ${mealTypeInstructions[mealType]}
+        
+        ${cuisine ? `Cuisine preference: ${cuisine}` : 'Mix of cuisines appropriate for the meal type'}
+        ${dietary === 'Veg' ? 'VEGETARIAN ONLY - No meat, fish, or eggs' : ''}
+        ${healthConditions.length > 0 ? `Health conditions to consider: ${healthConditions.join(', ')}` : ''}
+        ${allergies.length > 0 ? `ALLERGIES - NEVER suggest these: ${allergies.join(', ')}` : ''}
+        ${previousMeals.length > 0 ? `Avoid these (already planned): ${previousMeals.join(', ')}` : ''}
+        
+        Requirements:
+        - Suggest 5 varied options for ${mealType}
+        - Include a mix of quick (under 30 min) and regular options
+        - Provide practical, home-cookable recipes
+        - Be specific with dish names
+        
+        Return JSON array:
+        [
+            {
+                "id": "unique-id",
+                "title": "Dish Name",
+                "description": "One line appetizing description",
+                "prepTime": "10 min",
+                "cookTime": "20 min", 
+                "totalTime": "30 min",
+                "calories": "280 kcal",
+                "difficulty": "Easy" | "Medium" | "Hard",
+                "ingredients": ["ingredient 1", "ingredient 2", "..."],
+                "isQuick": true or false (true if under 30 min total)
+            }
+        ]
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            const suggestions = JSON.parse(text);
+            if (!Array.isArray(suggestions)) throw new Error("Invalid format");
+            return suggestions as MealSuggestion[];
+        } catch (e) {
+            console.error("Failed to parse meal suggestions:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'generateMealSuggestions');
+}
+
+/**
+ * Generate aggregated grocery list from planned meals
+ */
+export interface GroceryItem {
+    name: string;
+    category: 'produce' | 'dairy' | 'protein' | 'grains' | 'spices' | 'other';
+    quantity: string;
+    forRecipes: string[];
+}
+
+export interface GroceryList {
+    items: GroceryItem[];
+    totalRecipes: number;
+    estimatedCost?: string;
+}
+
+export async function generateGroceryList(
+    plannedMeals: { title: string; ingredients: string[] }[]
+): Promise<GroceryList> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: {
+                responseMimeType: "application/json",
+                temperature: 0.3
+            }
+        });
+
+        const allIngredients = plannedMeals.flatMap(m =>
+            m.ingredients.map(i => ({ ingredient: i, recipe: m.title }))
+        );
+
+        const prompt = `
+        You are a smart grocery list optimizer. Given these planned meals and their ingredients, create an optimized shopping list.
+        
+        PLANNED MEALS:
+        ${plannedMeals.map(m => `- ${m.title}: ${m.ingredients.join(', ')}`).join('\n')}
+        
+        TASKS:
+        1. AGGREGATE similar ingredients (e.g., "2 onions" + "1 onion" = "3 onions")
+        2. CATEGORIZE each item into: produce, dairy, protein, grains, spices, other
+        3. STANDARDIZE quantities where possible
+        4. TRACK which recipes need each ingredient
+        
+        Return JSON:
+        {
+            "items": [
+                {
+                    "name": "Onions",
+                    "category": "produce",
+                    "quantity": "6 medium",
+                    "forRecipes": ["Pasta Sauce", "Curry", "Stir Fry"]
+                }
+            ],
+            "totalRecipes": ${plannedMeals.length}
+        }
+        
+        Categories:
+        - produce: vegetables, fruits, herbs
+        - dairy: milk, cheese, butter, yogurt, cream
+        - protein: meat, fish, eggs, tofu, paneer, legumes
+        - grains: rice, flour, pasta, bread, oats
+        - spices: spices, seasonings, oils, sauces
+        - other: everything else
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            return JSON.parse(text) as GroceryList;
+        } catch (e) {
+            console.error("Failed to parse grocery list:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'generateGroceryList');
+}
