@@ -64,7 +64,7 @@ export default function CookAlongPage() {
                 <div className="w-10" /> {/* Spacer */}
             </div>
 
-            <div className="max-w-4xl w-full px-6 pb-20 space-y-8 animate-fade-in">
+            <div className="max-w-4xl w-full px-6 pb-24 space-y-8 animate-fade-in">
 
                 {/* Initial Input State (Always visible until recipe generated, or move up if generated) */}
                 <div className={`transition-all duration-500 ${recipe ? 'hidden' : 'flex flex-col items-center py-20'}`}>

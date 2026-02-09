@@ -129,7 +129,7 @@ export default function DescribePage() {
     };
 
     return (
-        <div className="min-h-screen bg-black text-white px-5 pt-6 pb-12">
+        <div className="min-h-screen bg-black text-white px-5 pt-6 pb-24">
             {/* Header */}
             <header className="flex items-center gap-4 mb-8">
                 <button

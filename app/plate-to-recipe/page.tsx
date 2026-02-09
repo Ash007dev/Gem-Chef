@@ -164,7 +164,7 @@ export default function PlateToRecipePage() {
                 </div>
             </header>
 
-            <main className="px-5 py-6">
+            <main className="px-5 py-6 pb-24">
                 {/* No Image State */}
                 {!capturedImage && (
                     <div className="animate-fade-in">
