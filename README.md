@@ -145,5 +145,32 @@ Follow these steps to run Gem-Chef locally:
 5.  **Open the Application**
     Open your browser and navigate to `http://localhost:3000` to start using Gem-Chef.
 
+## Our Journey
+
+### 1. Inspiration
+The idea for **Gem-Chef** was born from a simple yet persistent frustration: opening a fully stocked fridge and still feeling like there's nothing to eat. We realized that the problem wasn't a lack of food, but a lack of *connected intelligence* in the kitchen. We wanted to build a bridge between the ingredients people own and the potential meals they could create, while simultaneously tackling the global issue of food waste.
+
+### 2. What We Learned
+Throughout the development process, we gained profound insights into the capabilities of multimodal AI:
+*   **Prompt Engineering is Art**: Crafting prompts that yield consistent JSON structures from a creative model required iterative refinement. We learned that providing "persona" context (e.g., *"You are a professional chef..."*) significantly improved the quality of culinary advice.
+*   **Latency Matters**: In a high-utility app like a cooking assistant, waiting 10 seconds for a response breaks the flow. Optimizing for `gemini-flash` models was crucial for user retention.
+*   **State Management**: Managing the complex state of a cooking session—timers, current step, voice status, and ingredient checks—taught us the importance of robust frontend architecture.
+
+### 3. How We Built It
+We adopted an iterative, feature-first approach:
+1.  **Core Intelligence**: We started by building the `gemini.ts` utility, establishing a robust interface for text and vision requests.
+2.  **Visual Proof-of-Concept**: We built the "Ingredient Scan" feature first to validate the vision capabilities of Gemini Pro.
+3.  **The Cooking Engine**: We developed the state machine for the "Cook Mode," integrating TTS (Text-to-Speech) and voice recognition.
+4.  **Integration**: Finally, we wove these isolated features into a cohesive React application using Next.js 14, ensuring smooth transitions between planning, scanning, and cooking.
+
+The mathematical backbone of our nutrition tracking uses standard macro-nutrient formulas:
+$$ Total\ Calories \approx (4 \times Protein_g) + (4 \times Carbs_g) + (9 \times Fat_g) $$
+This allowed us to provide accurate, real-time nutrition estimates for every generated recipe.
+
+### 4. Challenges We Faced
+*   **Hallucinations in Recipes**: Initially, the AI would sometimes invent ingredients that weren't in the user's inventory. We solved this by implementing a strict "Inventory Check" pre-processing step and adjusting the temperature of the model.
+*   **Vision Consistency**: Distinguishing between a "red onion" and a "shallot" or recognizing obscure vegetables was challenging. We improved this by sending higher-resolution image segments and refining the vision prompt to ask for confidence scores.
+*   **JSON Parsing Errors**: The generative nature of LLMs meant that JSON outputs were occasionally malformed. We implemented a robust retry logic with error correction that attempts to repair broken JSON before failing.
+
 ## License
 This project is for educational and portfolio purposes. All AI-generated content should be verified for safety before use.
