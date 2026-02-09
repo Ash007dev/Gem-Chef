@@ -20,6 +20,7 @@ import {
     Timer,
     CookingPot,
     Calendar,
+    NotebookPen,
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -213,6 +214,16 @@ export default function LandingPage() {
                         <ImageIcon className="w-5 h-5 text-orange-400 mb-3" />
                         <h4 className="text-white text-sm font-medium mb-0.5">Plate to Recipe</h4>
                         <p className="text-gray-500 text-xs">Photo to full recipe</p>
+                    </button>
+
+                    {/* My Recipes */}
+                    <button
+                        onClick={() => router.push('/my-recipes')}
+                        className="bg-dark-card border border-dark-border rounded-xl p-4 text-left hover:bg-dark-elevated active:scale-[0.97] transition-all"
+                    >
+                        <NotebookPen className="w-5 h-5 text-amber-400 mb-3" />
+                        <h4 className="text-white text-sm font-medium mb-0.5">My Recipes</h4>
+                        <p className="text-gray-500 text-xs">Your personal collection</p>
                     </button>
 
                     {/* Analytics */}
