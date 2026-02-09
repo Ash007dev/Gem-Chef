@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Camera, Upload, Shuffle, MapPin, Utensils, Leaf, SlidersHorizontal, ChefHat, User, Clock } from 'lucide-react';
 import { identifyIngredients, fileToBase64 } from '@/utils/gemini';
@@ -11,7 +11,7 @@ type DietaryPref = 'Veg' | 'Non-Veg' | 'Both';
 type CookingStyle = 'Quick & Easy' | 'Restaurant Style' | 'Healthy' | 'Comfort Food';
 type AgeGroup = 'Baby (0-2)' | 'Toddler (2-5)' | 'Kid (5-12)' | 'Teen (13-19)' | 'Adult (20-59)' | 'Senior (60+)';
 
-export default function ScanPage() {
+function ScanContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -405,5 +405,17 @@ export default function ScanPage() {
                 initialAgeGroup={ageGroup}
             />
         </div>
+    );
+}
+
+export default function ScanPage() {
+    return (
+        <Suspense fallback={
+            <div className="min-h-screen bg-black flex items-center justify-center">
+                <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            </div>
+        }>
+            <ScanContent />
+        </Suspense>
     );
 }
