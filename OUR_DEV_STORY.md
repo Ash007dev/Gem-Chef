@@ -43,7 +43,7 @@ The development process was iterative and focused on core user flows.
     R_{final} = f(I_{available}, C_{dietary}, T_{time})
     $$
     
-    *Where $R$ is the recipe, $I$ is ingredients, $C$ is constraints, and $T$ is time.*
+    *Where R is the recipe, I is ingredients, C is constraints, and T is time.*
 
 3.  **The Agent (Cooking Mode)**:
     The most complex feature was the interactive cooking mode. I created a state machine to track the current step and integrated the browser's Speech Synthesis API for voice guidance. Adding the "Verify Step" button required sending the current camera frame to Gemini with the prompt: *"Does this look like step X is complete?"*.
