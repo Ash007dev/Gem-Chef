@@ -302,7 +302,7 @@ function RecipesContent() {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-black px-5 pt-12 pb-24">
+            <div className="min-h-screen bg-black px-5 pt-12 pb-44">
                 <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-400 mb-8">
                     <ArrowLeft className="w-5 h-5" />
                     <span>Back</span>
@@ -318,7 +318,7 @@ function RecipesContent() {
     }
 
     return (
-        <div className="min-h-screen bg-black px-5 pt-12 pb-24">
+        <div className="min-h-screen bg-black px-5 pt-12 pb-44">
             {/* Header */}
             <header className="flex items-center justify-between mb-6">
                 <button onClick={() => router.back()} className="flex items-center gap-2 text-gray-400">

@@ -552,7 +552,7 @@ export default function MealPlannerPage() {
 
             {/* Bottom Action Bar */}
             {getTotalMeals() > 0 && (
-                <div className="fixed bottom-0 left-0 right-0 p-4 bg-black/95 backdrop-blur-sm border-t border-dark-border">
+                <div className="fixed bottom-16 left-0 right-0 p-4 bg-black/95 backdrop-blur-sm border-t border-dark-border">
                     <button
                         onClick={handleGenerateGroceryList}
                         disabled={generatingList}
