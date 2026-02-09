@@ -57,13 +57,16 @@ export function deleteDietPlan(): void {
  */
 export function logNutrition(entry: NutritionLog): void {
     try {
+        console.log('[NutritionStorage] logNutrition called with:', entry);
         const logs = getNutritionLogs();
+        console.log('[NutritionStorage] Current logs count:', logs.length);
         logs.push(entry);
         // Keep last 365 days of logs
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() - 365);
         const filtered = logs.filter(log => new Date(log.date) >= cutoffDate);
         localStorage.setItem(NUTRITION_LOGS_KEY, JSON.stringify(filtered));
+        console.log('[NutritionStorage] Saved logs count:', filtered.length);
     } catch (error) {
         console.error('Failed to log nutrition:', error);
     }

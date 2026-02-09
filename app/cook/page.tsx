@@ -261,6 +261,7 @@ function SubstitutionModal({
 // Completion Modal with Share Feature
 function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () => void }) {
     const [servingsConsumed, setServingsConsumed] = useState(1);
+    const [nutritionLogged, setNutritionLogged] = useState(false);
 
     const [showShare, setShowShare] = useState(false);
     const [dishPhoto, setDishPhoto] = useState<string | null>(null);
@@ -269,7 +270,16 @@ function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () =>
     const fileInputRef = useRef<HTMLInputElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    // Save to cooklog and log nutrition (prevent duplicates - only add once per recipe per session)
+    const getMealTypeFromTime = () => {
+        const hour = new Date().getHours();
+        if (hour < 10) return 'Breakfast';
+        if (hour < 12) return 'Brunch';
+        if (hour < 15) return 'Lunch';
+        if (hour < 18) return 'Snack';
+        return 'Dinner';
+    };
+
+    // Save to cooklog only once on mount
     useEffect(() => {
         const savedLog = localStorage.getItem('cooklog');
         const cooklog = savedLog ? JSON.parse(savedLog) : [];
@@ -287,32 +297,60 @@ function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () =>
             });
             localStorage.setItem('cooklog', JSON.stringify(cooklog.slice(0, 50)));
         }
+    }, [recipe]);
 
-        // Log nutrition
-        if (recipe.nutrition) {
-            const { logNutrition, generateLogId, getTodayDate } = require('@/utils/nutrition-storage');
-            const totalNutrition = {
-                calories: recipe.nutrition.calories * servingsConsumed,
-                protein: recipe.nutrition.protein * servingsConsumed,
-                carbs: recipe.nutrition.carbs * servingsConsumed,
-                fat: recipe.nutrition.fat * servingsConsumed,
-                fiber: (recipe.nutrition.fiber || 0) * servingsConsumed,
-                sodium: (recipe.nutrition.sodium || 0) * servingsConsumed,
-                sugar: (recipe.nutrition.sugar || 0) * servingsConsumed
-            };
+    // Log nutrition when finishing (called from handleFinish)
+    const logNutritionData = () => {
+        console.log('[Cook] logNutritionData called', {
+            nutritionLogged,
+            hasNutrition: !!recipe.nutrition,
+            servingsConsumed
+        });
 
-            logNutrition({
-                id: generateLogId(),
-                date: getTodayDate(),
-                recipeId: recipe.id,
-                recipeTitle: recipe.title,
-                mealType: getMealTypeFromTime(),
-                servings: servingsConsumed,
-                nutrition: totalNutrition,
-                timestamp: new Date().toISOString()
-            });
+        if (nutritionLogged) {
+            console.log('[Cook] Already logged, skipping');
+            return;
         }
-    }, [recipe, servingsConsumed]);
+
+        if (!recipe.nutrition) {
+            console.log('[Cook] No nutrition data in recipe, skipping');
+            return;
+        }
+
+        const { logNutrition, generateLogId, getTodayDate } = require('@/utils/nutrition-storage');
+        const totalNutrition = {
+            calories: recipe.nutrition.calories * servingsConsumed,
+            protein: recipe.nutrition.protein * servingsConsumed,
+            carbs: recipe.nutrition.carbs * servingsConsumed,
+            fat: recipe.nutrition.fat * servingsConsumed,
+            fiber: (recipe.nutrition.fiber || 0) * servingsConsumed,
+            sodium: (recipe.nutrition.sodium || 0) * servingsConsumed,
+            sugar: (recipe.nutrition.sugar || 0) * servingsConsumed
+        };
+
+        const logEntry = {
+            id: generateLogId(),
+            date: getTodayDate(),
+            recipeId: recipe.id,
+            recipeTitle: recipe.title,
+            mealType: getMealTypeFromTime(),
+            servings: servingsConsumed,
+            nutrition: totalNutrition,
+            timestamp: new Date().toISOString()
+        };
+
+        console.log('[Cook] Logging nutrition entry:', logEntry);
+        logNutrition(logEntry);
+        console.log('[Cook] Nutrition logged successfully');
+
+        setNutritionLogged(true);
+    };
+
+    // Handle finish - log nutrition then call onFinish
+    const handleFinish = () => {
+        logNutritionData();
+        onFinish();
+    };
 
     const handlePhotoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -540,7 +578,7 @@ function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () =>
 
                                     {/* Done */}
                                     <button
-                                        onClick={onFinish}
+                                        onClick={handleFinish}
                                         className="w-full py-3 text-gray-500 text-sm"
                                     >
                                         Done
@@ -557,14 +595,6 @@ function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () =>
         );
     }
 
-    const getMealTypeFromTime = () => {
-        const hour = new Date().getHours();
-        if (hour < 10) return 'Breakfast';
-        if (hour < 12) return 'Brunch';
-        if (hour < 15) return 'Lunch';
-        if (hour < 18) return 'Snack';
-        return 'Dinner';
-    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 animate-fade-in">
@@ -630,7 +660,7 @@ function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () =>
                     Share Your Dish
                 </button>
                 <button
-                    onClick={onFinish}
+                    onClick={handleFinish}
                     className="w-full py-3 bg-dark-elevated border border-dark-border text-white rounded-xl font-medium"
                 >
                     Done

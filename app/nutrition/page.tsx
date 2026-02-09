@@ -33,41 +33,72 @@ export default function NutritionPage() {
     const [showDietSetup, setShowDietSetup] = useState(false);
     const [view, setView] = useState<'today' | 'week'>('today');
 
-    // Load data
+    // Load data on mount and when page becomes visible again
     useEffect(() => {
         loadData();
+
+        // Reload data when page becomes visible (e.g., returning from another tab/page)
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                console.log('[Nutrition] Page became visible, reloading data...');
+                loadData();
+            }
+        };
+
+        // Reload data when window gains focus
+        const handleFocus = () => {
+            console.log('[Nutrition] Window focused, reloading data...');
+            loadData();
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('focus', handleFocus);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('focus', handleFocus);
+        };
     }, []);
 
+    // Default diet plan for calculations when user hasn't set one
+    const defaultPlan: DietPlan = {
+        dailyCalories: 2000,
+        macros: { protein: 100, carbs: 250, fat: 65 },
+        dietType: 'maintenance',
+        startDate: new Date().toISOString().split('T')[0],
+        isActive: true
+    };
+
     const loadData = () => {
+        console.log('[Nutrition] loadData called');
         const plan = getDietPlan();
+        console.log('[Nutrition] Diet plan:', plan);
         setDietPlan(plan);
 
         const today = getTodayDate();
+        console.log('[Nutrition] Today date:', today);
         const dailyData = getDailyTotals(today);
+        console.log('[Nutrition] Daily data:', dailyData);
         setTodayData(dailyData);
 
         const weekly = getWeeklyLogs();
+        console.log('[Nutrition] Weekly data:', weekly);
         setWeeklyData(weekly);
 
-        if (plan) {
-            const consumed = {
-                calories: dailyData.totalCalories,
-                protein: dailyData.totalProtein,
-                carbs: dailyData.totalCarbs,
-                fat: dailyData.totalFat,
-                fiber: dailyData.totalFiber
-            };
-            const prog = calculateProgress(consumed, plan);
-            setProgress(prog);
-        }
+        // Always calculate progress (use defaults if no plan)
+        const activePlan = plan || defaultPlan;
+        const consumed = {
+            calories: dailyData.totalCalories,
+            protein: dailyData.totalProtein,
+            carbs: dailyData.totalCarbs,
+            fat: dailyData.totalFat,
+            fiber: dailyData.totalFiber
+        };
+        console.log('[Nutrition] Consumed today:', consumed);
+        const prog = calculateProgress(consumed, activePlan);
+        console.log('[Nutrition] Progress:', prog);
+        setProgress(prog);
     };
-
-    // Show setup if no diet plan
-    useEffect(() => {
-        if (!dietPlan) {
-            setShowDietSetup(true);
-        }
-    }, [dietPlan]);
 
     const CircularProgress = ({ value, max, label, color }: { value: number; max: number; label: string; color: string }) => {
         const percentage = max > 0 ? Math.min((value / max) * 100, 100) : 0;
@@ -135,34 +166,9 @@ export default function NutritionPage() {
         );
     };
 
-    if (!dietPlan) {
-        return (
-            <>
-                <div className="min-h-screen bg-black px-5 pt-12 pb-24 flex flex-col items-center justify-center">
-                    <div className="text-center max-w-sm">
-                        <div className="w-20 h-20 bg-dark-card rounded-full flex items-center justify-center mx-auto mb-6">
-                            <Target className="w-10 h-10 text-gray-400" />
-                        </div>
-                        <h1 className="text-2xl font-bold text-white mb-2">Set Your Diet Goals</h1>
-                        <p className="text-gray-400 mb-8">
-                            Create a personalized diet plan to start tracking your nutrition
-                        </p>
-                        <button
-                            onClick={() => setShowDietSetup(true)}
-                            className="w-full py-4 bg-white text-black rounded-xl font-semibold"
-                        >
-                            Get Started
-                        </button>
-                    </div>
-                </div>
-                <DietSetup
-                    isOpen={showDietSetup}
-                    onClose={() => router.push('/')}
-                    onComplete={loadData}
-                />
-            </>
-        );
-    }
+    // If no diet plan, use sensible defaults so user can still view their logs
+    const effectivePlan = dietPlan || defaultPlan;
+
 
     const weeklySummary = getWeeklySummary();
 
@@ -190,8 +196,8 @@ export default function NutritionPage() {
                 <button
                     onClick={() => setView('today')}
                     className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${view === 'today'
-                            ? 'bg-white text-black'
-                            : 'bg-dark-card text-gray-400'
+                        ? 'bg-white text-black'
+                        : 'bg-dark-card text-gray-400'
                         }`}
                 >
                     Today
@@ -199,8 +205,8 @@ export default function NutritionPage() {
                 <button
                     onClick={() => setView('week')}
                     className={`flex-1 py-2 rounded-lg text-sm font-medium transition-colors ${view === 'week'
-                            ? 'bg-white text-black'
-                            : 'bg-dark-card text-gray-400'
+                        ? 'bg-white text-black'
+                        : 'bg-dark-card text-gray-400'
                         }`}
                 >
                     This Week
@@ -214,14 +220,14 @@ export default function NutritionPage() {
                         <div className="flex justify-center mb-6">
                             <CircularProgress
                                 value={todayData.totalCalories}
-                                max={dietPlan.dailyCalories}
+                                max={effectivePlan.dailyCalories}
                                 label="Calories"
                                 color={progress.isOverGoal ? 'text-red-400' : 'text-white'}
                             />
                         </div>
                         {progress.isOverGoal && (
                             <div className="text-center text-sm text-red-400 mb-4">
-                                ⚠️ Over daily goal by {Math.round(todayData.totalCalories - dietPlan.dailyCalories)} cal
+                                ⚠️ Over daily goal by {Math.round(todayData.totalCalories - effectivePlan.dailyCalories)} cal
                             </div>
                         )}
                         {!progress.isOverGoal && progress.remaining.calories > 0 && (
@@ -237,19 +243,19 @@ export default function NutritionPage() {
                         <MacroBar
                             label="Protein"
                             value={todayData.totalProtein}
-                            max={dietPlan.macros.protein}
+                            max={effectivePlan.macros.protein}
                             color="bg-blue-500"
                         />
                         <MacroBar
                             label="Carbs"
                             value={todayData.totalCarbs}
-                            max={dietPlan.macros.carbs}
+                            max={effectivePlan.macros.carbs}
                             color="bg-green-500"
                         />
                         <MacroBar
                             label="Fat"
                             value={todayData.totalFat}
-                            max={dietPlan.macros.fat}
+                            max={effectivePlan.macros.fat}
                             color="bg-yellow-500"
                         />
                     </section>
