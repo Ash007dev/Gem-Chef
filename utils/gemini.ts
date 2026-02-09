@@ -116,6 +116,15 @@ export interface Recipe {
     };
     steps: string[];
     mealPrep: string[];
+    nutrition: {
+        calories: number;
+        protein: number;
+        carbs: number;
+        fat: number;
+        fiber?: number;
+        sodium?: number;
+        sugar?: number;
+    };
 }
 
 /**
@@ -205,6 +214,13 @@ export async function generateRecipes(
            - "2 medium onions (about 200g), finely diced"
            - "1 cup rice (200g) - Basmati or any long-grain rice works"
 
+        4. NUTRITION CALCULATION - For each recipe, calculate detailed nutrition PER SERVING:
+            - Use standard nutrition databases (USDA, etc.) for ingredient values
+            - Calculate based on exact ingredient quantities
+            - Account for cooking methods (oil absorption, water loss, etc.)
+            - Round to whole numbers for readability
+            - Include: calories, protein (g), carbs (g), fat (g), fiber (g), sodium (mg), sugar (g)
+
         Return JSON array with this exact schema:
         [
           {
@@ -230,7 +246,16 @@ export async function generateRecipes(
               "Step 3: Add the mustard seeds. They will start to pop and splutter within 10-15 seconds. Cover with a lid to prevent splattering. Once the popping slows down, proceed to the next step.",
               "...continue with equally detailed steps..."
             ],
-            "mealPrep": ["Can be stored in refrigerator for 3 days", "Reheat in microwave for 2 minutes"]
+            "mealPrep": ["Can be stored in refrigerator for 3 days", "Reheat in microwave for 2 minutes"],
+            "nutrition": {
+              "calories": 350,
+              "protein": 15,
+              "carbs": 45,
+              "fat": 12,
+              "fiber": 8,
+              "sodium": 450,
+              "sugar": 5
+            }
           }
         ]
         `;

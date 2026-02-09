@@ -2,10 +2,11 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Utensils, BookOpen, Settings } from 'lucide-react';
+import { Utensils, BookOpen, Settings, Activity } from 'lucide-react';
 
 const navItems = [
     { href: '/', label: 'Today', icon: Utensils },
+    { href: '/nutrition', label: 'Nutrition', icon: Activity },
     { href: '/cooklog', label: 'Cooklog', icon: BookOpen },
     { href: '/preferences', label: 'Preferences', icon: Settings },
 ];
@@ -31,8 +32,8 @@ export default function BottomNav() {
                             key={item.href}
                             href={item.href}
                             className={`flex flex-col items-center justify-center gap-1 min-w-[64px] py-2 rounded-lg transition-colors ${isActive
-                                    ? 'text-white'
-                                    : 'text-gray-500 hover:text-gray-300'
+                                ? 'text-white'
+                                : 'text-gray-500 hover:text-gray-300'
                                 }`}
                         >
                             <Icon className="w-5 h-5" strokeWidth={isActive ? 2 : 1.5} />
