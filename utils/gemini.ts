@@ -235,7 +235,11 @@ export async function generateRecipes(
         healthConditions?: string[];
         allergies?: string[];
         // Time filter (Quick Cook feature)
+        // Time filter (Quick Cook feature)
         maxTime?: number | null;
+        // Specific dish mode
+        dishName?: string;
+        description?: string;
     } = {}
 ): Promise<Recipe[]> {
     return generateWithFallback(async (modelName) => {
@@ -256,7 +260,9 @@ export async function generateRecipes(
             ageGroup = 'Adult (20-59)',
             healthConditions = [],
             allergies = [],
-            maxTime = null
+            maxTime = null,
+            dishName = '',
+            description = ''
         } = context;
 
         // Determine the cuisine to use
@@ -433,7 +439,12 @@ export async function generateRecipes(
         You are a professional chef creating recipes for COMPLETE BEGINNERS who have never cooked before.
         
         Context:
-        - Available ingredients: ${ingredients.join(', ')}
+        ${dishName
+                ? `- The user wants to cook a specific dish: "${dishName}"
+               - Description/Memory: "${description}"
+               - IGNORE the "Available ingredients" list as the user wants this specific dish.`
+                : `- Available ingredients: ${ingredients.join(', ')}`
+            }
         - Meal time: ${meal}
         - Dietary preference: ${dietary === 'Veg' ? 'STRICTLY VEGETARIAN ONLY - absolutely NO meat, chicken, fish, seafood, eggs, or any non-vegetarian ingredient whatsoever. Only pure vegetarian dishes using vegetables, grains, legumes, dairy (milk, cheese, paneer, butter, ghee, curd/yogurt), nuts, and plant-based ingredients.' : dietary === 'Non-Veg' ? 'Non-vegetarian preferred (meat, chicken, fish, seafood, eggs allowed)' : 'No restriction (both vegetarian and non-vegetarian OK)'}
         - Cooking style: ${style} - ${styleHints[style] || 'Balanced approach'}
@@ -462,6 +473,14 @@ export async function generateRecipes(
         Double-check every recipe and every ingredient to ensure strict vegetarian compliance.
         ` : ''}
 
+        ${dishName ? `
+        GENERATE 9 RECIPES FOR "${dishName}":
+        1. The Authentic/Classic Version of ${dishName} (isRegional: true)
+        2. ${dishName} with a Twist (Fusion or Modern) (isRegional: true)
+        3. A Healthy/Lighter Version of ${dishName} (isRegional: true)
+        4-9. Other variations or similar dishes from the same cuisine/style.
+        ` :
+                `
         ${ageRecipeOverride ? ageRecipeOverride : `GENERATE 9 RECIPES TOTAL:
         
         FIRST 3 - REGIONAL SIGNATURE DISHES (isRegional: true):
@@ -469,13 +488,14 @@ export async function generateRecipes(
         
         NEXT 6 - REGULAR RECIPES based on "${style}" style:
         ${style === 'Quick & Easy' ?
-                    '4. Super Quick (15 min), 5. Easy Weeknight, 6. No-Cook/Minimal, 7. One-Pan, 8. 5-Ingredient, 9. Microwave-Friendly' :
-                    style === 'Restaurant Style' ?
-                        '4. Fine Dining, 5. Professional Plating, 6. Complex Flavors, 7. Gourmet Fusion, 8. Chef\'s Special, 9. Signature Dish' :
-                        style === 'Healthy' ?
-                            '4. Low-Carb, 5. High-Protein, 6. Superfood Bowl, 7. Clean Eating, 8. Meal Prep Friendly, 9. Light & Fresh' :
-                            '4. Nostalgic Home Cooking, 5. Hearty One-Pot, 6. Creamy & Rich, 7. Fried Favorites, 8. Slow-Cooked, 9. Family Recipe Style'
-                }
+                        '4. Super Quick (15 min), 5. Easy Weeknight, 6. No-Cook/Minimal, 7. One-Pan, 8. 5-Ingredient, 9. Microwave-Friendly' :
+                        style === 'Restaurant Style' ?
+                            '4. Fine Dining, 5. Professional Plating, 6. Complex Flavors, 7. Gourmet Fusion, 8. Chef\'s Special, 9. Signature Dish' :
+                            style === 'Healthy' ?
+                                '4. Low-Carb, 5. High-Protein, 6. Superfood Bowl, 7. Clean Eating, 8. Meal Prep Friendly, 9. Light & Fresh' :
+                                '4. Nostalgic Home Cooking, 5. Hearty One-Pot, 6. Creamy & Rich, 7. Fried Favorites, 8. Slow-Cooked, 9. Family Recipe Style'
+                    }
+        `}
         `}
 
         CRITICAL REQUIREMENTS FOR BEGINNER-FRIENDLY RECIPES:
@@ -667,5 +687,208 @@ export async function getCookingTip(
             throw new Error(`Invalid JSON response from ${modelName}`);
         }
     }, 'getCookingTip');
+}
+
+export interface DishIdentity {
+    dishName: string;
+    cuisine: string;
+    description: string;
+    confidence: string;
+}
+
+/**
+ * Identifies a dish from an image using Gemini Vision
+ */
+export async function identifyDish(
+    imageBase64: string,
+    mimeType: string = 'image/jpeg'
+): Promise<DishIdentity> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `
+        Identify this specific dish.
+        Analyze the visual appearance, ingredients, and presentation.
+        
+        Return JSON:
+        {
+            "dishName": "Name of the dish (e.g. Penne Rosa, Butter Chicken)",
+            "cuisine": "Cuisine origin (e.g. Italian, Indian)",
+            "description": "Brief description of what is widely known about this dish",
+            "confidence": "High" | "Medium" | "Low"
+        }
+        `;
+
+        const imagePart = {
+            inlineData: {
+                data: imageBase64,
+                mimeType
+            }
+        };
+
+        const result = await model.generateContent([prompt, imagePart]);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            return JSON.parse(text) as DishIdentity;
+        } catch (e) {
+            console.error("Failed to parse dish identity JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'identifyDish');
+}
+
+/**
+ * Identifies a dish directly from a text description (fallback when image gen fails)
+ */
+export async function identifyDishFromText(
+    description: string
+): Promise<DishIdentity> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `
+        Identify the dish described here: "${description}"
+        
+        Return JSON:
+        {
+            "dishName": "Name of the dish (e.g. Penne Rosa, Butter Chicken)",
+            "cuisine": "Cuisine origin (e.g. Italian, Indian)",
+            "description": "Brief description of the dish",
+            "confidence": "High" | "Medium" | "Low"
+        }
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            return JSON.parse(text) as DishIdentity;
+        } catch (e) {
+            console.error("Failed to parse dish identity JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'identifyDishFromText');
+}
+
+/**
+ * Generates an image of a dish based on description using Imagen 3.0 via REST API
+ * Note: standard GoogleGenerativeAI SDK doesn't fully support Imagen yet, using REST fallback
+ */
+export async function generateDishImage(description: string): Promise<string> {
+    const apiKey = API_KEYS[currentKeyIndex];
+    // Try multiple possible endpoints/models if one fails
+    // Note: 'imagen-3.0-generate-001' is the beta model
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-001:predict?key=${apiKey}`;
+
+    const payload = {
+        instances: [
+            { prompt: `Professional food photography, close-up, high quality: ${description}` }
+        ],
+        parameters: {
+            sampleCount: 1,
+            aspectRatio: "1:1",
+            outputOptions: { mimeType: "image/jpeg" }
+        }
+    };
+
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error(`Imagen API Error (${response.status}):`, errText);
+            throw new Error(`Imagen API error: ${response.status} - ${errText}`);
+        }
+
+        const data = await response.json();
+
+        if (data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded) {
+            return data.predictions[0].bytesBase64Encoded;
+        } else if (data.predictions && typeof data.predictions[0] === 'string') {
+            return data.predictions[0];
+        }
+
+        throw new Error('Invalid response format from Imagen API');
+    } catch (error) {
+        console.error("Failed to generate image:", error);
+        throw error;
+    }
+}
+
+/**
+ * Transforms basic ingredients into creative gourmet recipes
+ */
+export async function generateGourmetTransformations(
+    basicIngredients: string,
+    category: string = 'General'
+): Promise<Recipe[]> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `
+        You are a creative chef specializing in "Gourmet Hacks" - transforming boring, basic ingredients into exciting, restaurant-quality meals using minimal additional items.
+
+        User has: "${basicIngredients}"
+        Category: ${category}
+
+        Generate 3-4 CREATIVE transformation recipes.
+        
+        Rules:
+        1. MUST use the user's basic ingredients as the star.
+        2. Keep additional ingredients minimal (common pantry staples like oil, spices, onions, milk, etc.).
+        3. Transformations should feel "Gourmet" or "Fusion" (e.g. Ramen -> Ramen Carbonara, Bread -> French Toast Roll-ups).
+        4. No boring standard recipes (e.g. just "Boiled Eggs").
+
+        Return JSON array matching this schema exactly:
+        [
+          {
+            "id": "unique-id",
+            "title": "Creative Recipe Name",
+            "description": "Appetizing description of the transformation",
+            "prepTime": "e.g. 5 min",
+            "cookTime": "e.g. 10 min",
+            "totalTime": "e.g. 15 min",
+            "servings": "1-2",
+            "difficulty": "Easy" | "Medium" | "Hard",
+            "calories": "Estimated calories",
+            "type": "fusion",
+            "ingredients": {
+              "provided": ["The basic ingredients used"],
+              "shoppingList": ["Extra pantry staples needed"]
+            },
+            "steps": ["Detailed step 1", "Step 2..."]
+          }
+        ]
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            return JSON.parse(text) as Recipe[];
+        } catch (e) {
+            console.error("Failed to parse gourmet recipes JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'generateGourmetTransformations');
 }
 

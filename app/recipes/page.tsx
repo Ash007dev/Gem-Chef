@@ -37,13 +37,15 @@ function RecipesContent() {
     const healthConditions = searchParams.get('healthConditions')?.split(',').filter(Boolean) || [];
     const allergies = searchParams.get('allergies')?.split(',').filter(Boolean) || [];
     const maxTime = searchParams.get('maxTime') ? parseInt(searchParams.get('maxTime')!, 10) : null;
+    const dishName = searchParams.get('dishName') || '';
+    const description = searchParams.get('description') || '';
 
     // Build a full cache key from all params to detect changes
-    const cacheKey = [ingredients.join(','), meal, dietary, location, style, cuisine, ageGroup, healthConditions.join(','), allergies.join(','), maxTime?.toString() || ''].join('|');
+    const cacheKey = [ingredients.join(','), meal, dietary, location, style, cuisine, ageGroup, healthConditions.join(','), allergies.join(','), maxTime?.toString() || '', dishName].join('|');
 
     const fetchRecipes = async () => {
-        if (ingredients.length === 0) {
-            setError('No ingredients provided');
+        if (ingredients.length === 0 && !dishName) {
+            setError('No ingredients or dish name provided');
             setLoading(false);
             return;
         }
@@ -54,7 +56,7 @@ function RecipesContent() {
         try {
             const result = await generateRecipes(ingredients, {
                 meal, dietary, location, style, cuisine, ageGroup,
-                healthConditions, allergies, maxTime
+                healthConditions, allergies, maxTime, dishName, description
             });
             setRecipes(result);
             // Cache recipes so back navigation doesn't regenerate
@@ -157,9 +159,11 @@ function RecipesContent() {
 
             {/* Context Info */}
             <div className="mb-6">
-                <h1 className="text-2xl font-bold text-white mb-2">Recipes</h1>
+                <h1 className="text-2xl font-bold text-white mb-2">
+                    {dishName ? `Recipes for "${dishName}"` : 'Recipes'}
+                </h1>
                 <p className="text-gray-500 text-sm">
-                    {recipes.length} recipes for {meal.toLowerCase()}
+                    {recipes.length} recipes {dishName ? 'found' : `for ${meal.toLowerCase()}`}
                 </p>
             </div>
 
