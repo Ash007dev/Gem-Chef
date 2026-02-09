@@ -653,3 +653,188 @@ export async function getCookingTip(
     }, 'getCookingTip');
 }
 
+export interface BillScanResult {
+    items: {
+        name: string;
+        quantity: string;
+        category?: string;
+    }[];
+}
+
+/**
+ * Scans a grocery bill/receipt image and extracts food items
+ * Uses Gemini Vision to understand the receipt and parse items
+ */
+export async function scanBill(
+    imageBase64: string,
+    mimeType: string = 'image/jpeg'
+): Promise<BillScanResult> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `
+        You are an expert OCR system specialized in reading grocery receipts and bills.
+        
+        STEP 1: CAREFULLY READ THE ENTIRE RECEIPT
+        - Look at every line item in the receipt
+        - Pay special attention to tabular data with columns (Sr.No, Name, Qty, Rate, Total)
+        - Read text even if slightly blurry or at an angle
+        - Look for item descriptions in the "Name of Product/Service" or similar column
+        
+        STEP 2: EXTRACT ALL FOOD AND GROCERY ITEMS
+        Food items include:
+        - Cooking oils (sunflower oil, olive oil, mustard oil, etc.)
+        - Cereals & breakfast items (corn flakes, oats, muesli, etc.)
+        - Dairy products (milk, butter, cheese, yogurt, ghee, paneer)
+        - Grains & pulses (rice, wheat, flour, dal, lentils, beans)
+        - Vegetables & fruits (fresh or packaged)
+        - Spices & condiments (salt, sugar, turmeric, masalas, sauces)
+        - Beverages (tea, coffee, juice, soft drinks)
+        - Meat, fish, eggs
+        - Bread, biscuits, snacks
+        - Packaged foods (noodles, pasta, ready-to-eat meals)
+        
+        DO NOT INCLUDE (filter these out):
+        - Household items (detergent, soap, cleaning supplies)
+        - Personal care (shampoo, toothpaste)
+        - Bags, containers, packaging
+        - Non-grocery items (backpacks, stationery, electronics)
+        - Tax, discounts, totals, subtotals
+        - Service charges
+        
+        STEP 3: FORMAT EACH ITEM
+        - Normalize names: "KELLOGGS CORN FLAKES" → "Corn Flakes"
+        - Extract quantity from Qty column (e.g., "1 KGS", "1 LTR", "2 pcs")
+        - Assign category: Produce, Dairy, Proteins, Pantry, Spices, Beverages, Other
+        
+        Return ONLY valid JSON in this exact format:
+        {
+            "items": [
+                {"name": "Clean Item Name", "quantity": "amount with unit", "category": "Category"}
+            ]
+        }
+        
+        IMPORTANT: Read EVERY row in the receipt table carefully. Don't miss any food items.
+        If no food items found, return: {"items": []}
+        `;
+
+        const imagePart = {
+            inlineData: {
+                data: imageBase64,
+                mimeType
+            }
+        };
+
+        const result = await model.generateContent([prompt, imagePart]);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            return JSON.parse(text) as BillScanResult;
+        } catch (e) {
+            console.error("Failed to parse bill scan JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'scanBill');
+}
+
+// =============================================================================
+// RECIPE FEASIBILITY CHECKER
+// =============================================================================
+
+export interface RecipeFeasibilityResult {
+    canMake: boolean;
+    recipeName: string;
+    availableIngredients: string[];
+    missingIngredients: string[];
+    partialMatch: boolean; // true if some ingredients available
+    recipe?: {
+        title: string;
+        description: string;
+        prepTime: string;
+        cookTime: string;
+        servings: string;
+        difficulty: string;
+        ingredients: string[];
+        steps: string[];
+        tips?: string[];
+    };
+    suggestion?: string; // Alternative suggestion if can't make
+}
+
+/**
+ * Analyzes if a recipe can be made with available inventory items
+ * If yes: returns full recipe with steps
+ * If no: returns missing ingredients list
+ */
+export async function analyzeRecipeFeasibility(
+    recipeName: string,
+    inventoryItems: string[]
+): Promise<RecipeFeasibilityResult> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `
+        You are a culinary expert analyzing if a recipe can be made with available ingredients.
+        
+        RECIPE REQUESTED: "${recipeName}"
+        
+        AVAILABLE INVENTORY:
+        ${inventoryItems.length > 0 ? inventoryItems.join(', ') : 'Empty inventory'}
+        
+        TASK:
+        1. Identify ALL ingredients needed for "${recipeName}"
+        2. Compare against the available inventory
+        3. Determine if the recipe CAN be made (70% or more essential ingredients available)
+        
+        RESPONSE RULES:
+        - Be flexible with ingredient matching (e.g., "tomatoes" matches "tomato", "onion" matches "onions")
+        - Consider common pantry staples (salt, pepper, oil, water) as available unless the inventory is completely empty
+        - For missing ingredients, only list ESSENTIAL ones (not garnishes or optional items)
+        
+        Return JSON in this EXACT format:
+        {
+            "canMake": true/false,
+            "recipeName": "Exact Recipe Name",
+            "availableIngredients": ["ingredient1", "ingredient2"],
+            "missingIngredients": ["missing1", "missing2"],
+            "partialMatch": true/false,
+            "recipe": {
+                "title": "Recipe Title",
+                "description": "Brief appetizing description",
+                "prepTime": "15 mins",
+                "cookTime": "30 mins",
+                "servings": "4",
+                "difficulty": "Easy/Medium/Hard",
+                "ingredients": ["1 cup rice", "2 tomatoes", ...],
+                "steps": ["Step 1: ...", "Step 2: ...", ...],
+                "tips": ["Optional tip 1", "Optional tip 2"]
+            },
+            "suggestion": "If can't make, suggest what to buy or alternative recipe"
+        }
+        
+        IMPORTANT:
+        - If canMake is TRUE, include the full recipe object
+        - If canMake is FALSE, recipe can be null/omitted, but include helpful suggestion
+        - partialMatch is TRUE if user has at least some ingredients (even if not enough to make the full recipe)
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            return JSON.parse(text) as RecipeFeasibilityResult;
+        } catch (e) {
+            console.error("Failed to parse recipe feasibility JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'analyzeRecipeFeasibility');
+}
+
