@@ -274,6 +274,15 @@ function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () =>
 
     const [deductedItems, setDeductedItems] = useState<string[]>([]);
 
+    const getMealTypeFromTime = () => {
+        const hour = new Date().getHours();
+        if (hour < 10) return 'Breakfast';
+        if (hour < 12) return 'Brunch';
+        if (hour < 15) return 'Lunch';
+        if (hour < 18) return 'Snack';
+        return 'Dinner';
+    };
+
     // Save to cooklog and deduct from inventory
     useEffect(() => {
         const savedLog = localStorage.getItem('cooklog');
