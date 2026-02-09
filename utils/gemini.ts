@@ -653,3 +653,70 @@ export async function getCookingTip(
     }, 'getCookingTip');
 }
 
+/**
+ * User-Submitted Recipe interface (personal collection)
+ */
+export interface UserRecipe {
+    id: string;
+    title: string;
+    description: string;
+    servings: string;
+    prepTime: string;
+    cookTime: string;
+    difficulty: 'Easy' | 'Medium' | 'Hard';
+    ingredients: string[];
+    steps: string[];
+    photo?: string; // base64 data URL
+    createdAt: string;
+    source: 'manual' | 'voice' | 'text-import';
+}
+
+/**
+ * Parses unstructured text (WhatsApp message, notes, voice transcript)
+ * into a structured UserRecipe using Gemini AI
+ */
+export async function parseRecipeText(rawText: string): Promise<Omit<UserRecipe, 'id' | 'createdAt' | 'source' | 'photo'>> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        const prompt = `You are a recipe parser. The user has provided unstructured text that describes a recipe. Parse it into a structured format.
+
+Input text:
+"""
+${rawText}
+"""
+
+Return valid JSON in this exact format:
+{
+  "title": "Recipe name",
+  "description": "A short 1-sentence description of the dish",
+  "servings": "e.g. 4 servings",
+  "prepTime": "e.g. 15 min",
+  "cookTime": "e.g. 30 min",
+  "difficulty": "Easy" | "Medium" | "Hard",
+  "ingredients": ["ingredient 1 with quantity", "ingredient 2 with quantity", ...],
+  "steps": ["Step 1 instruction", "Step 2 instruction", ...]
+}
+
+Rules:
+- Extract all ingredients with their quantities if mentioned
+- Break instructions into clear numbered steps
+- If servings/time are not mentioned, make a reasonable estimate
+- Keep the original language/style but make it clear and structured
+- If the text is very minimal, fill in reasonable defaults`;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            console.error("Failed to parse recipe text JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'parseRecipeText');
+}
