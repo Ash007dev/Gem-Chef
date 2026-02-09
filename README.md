@@ -120,7 +120,7 @@ Follow these steps to run Gem-Chef locally:
 
 1.  **Clone the Repository**
     ```bash
-    git clone <repository-url>
+    git clone https://github.com/Ash007dev/Gem-Chef.git
     cd Gem-Chef
     ```
 
