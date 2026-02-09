@@ -90,27 +90,46 @@ export default function PreferencesPage() {
                 async (position) => {
                     try {
                         const { latitude, longitude } = position.coords;
+                        console.log('Got coordinates:', latitude, longitude);
+
                         const res = await fetch(
                             `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-                            { headers: { 'User-Agent': 'SmartChef App' } }
+                            {
+                                headers: {
+                                    'User-Agent': 'SmartChef/1.0',
+                                    'Accept': 'application/json'
+                                }
+                            }
                         );
+
+                        if (!res.ok) {
+                            throw new Error('Geocoding failed');
+                        }
+
                         const data = await res.json();
-                        const city = data.address?.city || data.address?.town || data.address?.village || '';
-                        const state = data.address?.state || '';
-                        const locationStr = [city, state].filter(Boolean).join(', ') || 'Unknown';
+                        console.log('Location data:', data);
+
+                        const city = data.address?.city || data.address?.town || data.address?.village || data.address?.suburb || '';
+                        const state = data.address?.state || data.address?.county || '';
+                        const locationStr = [city, state].filter(Boolean).join(', ') || 'Location detected';
                         setPreferences(prev => ({ ...prev, location: locationStr }));
-                    } catch {
-                        setPreferences(prev => ({ ...prev, location: 'Unknown' }));
+                    } catch (err) {
+                        console.error('Geocoding error:', err);
+                        setPreferences(prev => ({ ...prev, location: 'Tap to retry' }));
                     } finally {
                         setIsDetecting(false);
                     }
                 },
-                () => {
-                    setPreferences(prev => ({ ...prev, location: 'Unknown' }));
+                (err) => {
+                    console.error('Geolocation error:', err.message);
+                    setPreferences(prev => ({ ...prev, location: 'Location access denied' }));
                     setIsDetecting(false);
                 },
-                { timeout: 5000 }
+                { timeout: 10000, enableHighAccuracy: false }
             );
+        } else {
+            setPreferences(prev => ({ ...prev, location: 'Geolocation not supported' }));
+            setIsDetecting(false);
         }
     };
 
@@ -152,184 +171,184 @@ export default function PreferencesPage() {
                 </div>
             ) : (<>
 
-            {/* Location Section */}
-            <section className="mb-8">
-                <h2 className="text-sm font-medium text-gray-500 mb-3">Location</h2>
-                <button
-                    onClick={detectLocation}
-                    disabled={isDetecting}
-                    className="w-full flex items-center justify-between p-4 bg-dark-card border border-dark-border rounded-xl"
-                >
-                    <div className="flex items-center gap-3">
-                        <MapPin className="w-5 h-5 text-gray-400" />
-                        <div className="text-left">
-                            <p className="text-white text-sm">
-                                {isDetecting ? 'Detecting...' : preferences.location || 'Tap to detect'}
-                            </p>
-                            <p className="text-gray-500 text-xs">Used for regional cuisine suggestions</p>
+                {/* Location Section */}
+                <section className="mb-8">
+                    <h2 className="text-sm font-medium text-gray-500 mb-3">Location</h2>
+                    <button
+                        onClick={detectLocation}
+                        disabled={isDetecting}
+                        className="w-full flex items-center justify-between p-4 bg-dark-card border border-dark-border rounded-xl"
+                    >
+                        <div className="flex items-center gap-3">
+                            <MapPin className="w-5 h-5 text-gray-400" />
+                            <div className="text-left">
+                                <p className="text-white text-sm">
+                                    {isDetecting ? 'Detecting...' : preferences.location || 'Tap to detect'}
+                                </p>
+                                <p className="text-gray-500 text-xs">Used for regional cuisine suggestions</p>
+                            </div>
                         </div>
-                    </div>
-                    <ChevronRight className="w-5 h-5 text-gray-600" />
-                </button>
-            </section>
+                        <ChevronRight className="w-5 h-5 text-gray-600" />
+                    </button>
+                </section>
 
-            {/* Dietary Preference */}
-            <section className="mb-8">
-                <h2 className="text-sm font-medium text-gray-500 mb-3">Dietary Preference</h2>
-                <div className="flex gap-2">
-                    {dietaryOptions.map((option) => (
-                        <button
-                            key={option}
-                            onClick={() => updateDietary(option)}
-                            className={`flex-1 py-3 rounded-xl text-sm font-medium transition-colors ${preferences.dietary === option
-                                ? 'bg-white text-black'
-                                : 'bg-dark-card border border-dark-border text-gray-400'
-                                }`}
-                        >
-                            {option}
-                        </button>
-                    ))}
-                </div>
-            </section>
-
-            {/* Age Group */}
-            <section className="mb-8">
-                <h2 className="text-sm font-medium text-gray-500 mb-3">Cooking For</h2>
-                <div className="flex flex-wrap gap-2">
-                    {ageGroups.map((option) => (
-                        <button
-                            key={option}
-                            onClick={() => updateAgeGroup(option)}
-                            className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${preferences.ageGroup === option
-                                ? 'bg-white text-black'
-                                : 'bg-dark-card border border-dark-border text-gray-400'
-                                }`}
-                        >
-                            {option}
-                        </button>
-                    ))}
-                </div>
-            </section>
-
-            {/* Cuisine Preferences */}
-            <section className="mb-8">
-                <h2 className="text-sm font-medium text-gray-500 mb-3">Cuisine by Meal</h2>
-                <div className="space-y-2">
-                    {mealTypes.map((meal) => (
-                        <div key={meal}>
+                {/* Dietary Preference */}
+                <section className="mb-8">
+                    <h2 className="text-sm font-medium text-gray-500 mb-3">Dietary Preference</h2>
+                    <div className="flex gap-2">
+                        {dietaryOptions.map((option) => (
                             <button
-                                onClick={() => setExpandedMeal(expandedMeal === meal ? null : meal)}
-                                className="w-full flex items-center justify-between p-4 bg-dark-card border border-dark-border rounded-xl"
+                                key={option}
+                                onClick={() => updateDietary(option)}
+                                className={`flex-1 py-3 rounded-xl text-sm font-medium transition-colors ${preferences.dietary === option
+                                    ? 'bg-white text-black'
+                                    : 'bg-dark-card border border-dark-border text-gray-400'
+                                    }`}
                             >
-                                <span className="text-white text-sm">{meal}</span>
-                                <div className="flex items-center gap-2">
-                                    <span className="text-gray-500 text-sm">
-                                        {preferences.cuisinePreferences[meal]}
-                                    </span>
-                                    {expandedMeal === meal ? (
-                                        <ChevronDown className="w-4 h-4 text-gray-500" />
-                                    ) : (
-                                        <ChevronRight className="w-4 h-4 text-gray-500" />
-                                    )}
-                                </div>
+                                {option}
                             </button>
-
-                            {/* Cuisine Options */}
-                            {expandedMeal === meal && (
-                                <div className="mt-2 p-3 bg-dark-elevated border border-dark-border rounded-xl animate-fade-in">
-                                    {/* Custom Input */}
-                                    <div className="flex gap-2 mb-3">
-                                        <input
-                                            type="text"
-                                            value={customInput}
-                                            onChange={(e) => setCustomInput(e.target.value)}
-                                            placeholder="Type custom cuisine..."
-                                            className="flex-1 px-3 py-2 bg-dark-card border border-dark-border rounded-lg text-white text-sm placeholder:text-gray-600"
-                                        />
-                                        <button
-                                            onClick={() => {
-                                                if (customInput.trim()) {
-                                                    updateCuisine(meal, customInput.trim());
-                                                    // Add to custom cuisines if not already in list
-                                                    if (!CUISINES.includes(customInput.trim()) &&
-                                                        !preferences.customCuisines.includes(customInput.trim())) {
-                                                        setPreferences(prev => ({
-                                                            ...prev,
-                                                            customCuisines: [...prev.customCuisines, customInput.trim()]
-                                                        }));
-                                                    }
-                                                    setCustomInput('');
-                                                }
-                                            }}
-                                            className="px-3 py-2 bg-white text-black rounded-lg"
-                                        >
-                                            <Plus className="w-4 h-4" />
-                                        </button>
-                                    </div>
-
-                                    {/* Preset + Custom Cuisines */}
-                                    <div className="grid grid-cols-2 gap-2">
-                                        {[...CUISINES, ...preferences.customCuisines].map((cuisine) => (
-                                            <button
-                                                key={cuisine}
-                                                onClick={() => updateCuisine(meal, cuisine)}
-                                                className={`p-3 rounded-lg text-sm text-left transition-colors ${preferences.cuisinePreferences[meal] === cuisine
-                                                    ? 'bg-white text-black'
-                                                    : 'bg-dark-card text-gray-300 hover:bg-dark-border'
-                                                    }`}
-                                            >
-                                                <div className="flex items-center justify-between">
-                                                    <span>{cuisine}</span>
-                                                    {preferences.cuisinePreferences[meal] === cuisine && (
-                                                        <Check className="w-4 h-4" />
-                                                    )}
-                                                </div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* Auto Delete */}
-            <section className="mb-8">
-                <h2 className="text-sm font-medium text-gray-500 mb-3">Data Management</h2>
-                <div className="p-4 bg-dark-card border border-dark-border rounded-xl">
-                    <div className="flex items-center justify-between">
-                        <div>
-                            <p className="text-white text-sm">Auto-delete cooklog entries</p>
-                            <p className="text-gray-500 text-xs">Remove entries older than</p>
-                        </div>
-                        <select
-                            value={preferences.autoDeleteDays}
-                            onChange={(e) => setPreferences(prev => ({
-                                ...prev,
-                                autoDeleteDays: Number(e.target.value)
-                            }))}
-                            className="bg-dark-elevated border border-dark-border rounded-lg px-3 py-2 text-sm text-white"
-                        >
-                            <option value={7}>7 days</option>
-                            <option value={30}>30 days</option>
-                            <option value={90}>90 days</option>
-                            <option value={0}>Never</option>
-                        </select>
+                        ))}
                     </div>
-                </div>
-            </section>
+                </section>
 
-            {/* Reset */}
-            <button
-                onClick={() => {
-                    setPreferences(DEFAULT_PREFERENCES);
-                    detectLocation();
-                }}
-                className="w-full py-3 bg-dark-card border border-dark-border rounded-xl text-gray-400 text-sm"
-            >
-                Reset to Defaults
-            </button>
+                {/* Age Group */}
+                <section className="mb-8">
+                    <h2 className="text-sm font-medium text-gray-500 mb-3">Cooking For</h2>
+                    <div className="flex flex-wrap gap-2">
+                        {ageGroups.map((option) => (
+                            <button
+                                key={option}
+                                onClick={() => updateAgeGroup(option)}
+                                className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${preferences.ageGroup === option
+                                    ? 'bg-white text-black'
+                                    : 'bg-dark-card border border-dark-border text-gray-400'
+                                    }`}
+                            >
+                                {option}
+                            </button>
+                        ))}
+                    </div>
+                </section>
+
+                {/* Cuisine Preferences */}
+                <section className="mb-8">
+                    <h2 className="text-sm font-medium text-gray-500 mb-3">Cuisine by Meal</h2>
+                    <div className="space-y-2">
+                        {mealTypes.map((meal) => (
+                            <div key={meal}>
+                                <button
+                                    onClick={() => setExpandedMeal(expandedMeal === meal ? null : meal)}
+                                    className="w-full flex items-center justify-between p-4 bg-dark-card border border-dark-border rounded-xl"
+                                >
+                                    <span className="text-white text-sm">{meal}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-gray-500 text-sm">
+                                            {preferences.cuisinePreferences[meal]}
+                                        </span>
+                                        {expandedMeal === meal ? (
+                                            <ChevronDown className="w-4 h-4 text-gray-500" />
+                                        ) : (
+                                            <ChevronRight className="w-4 h-4 text-gray-500" />
+                                        )}
+                                    </div>
+                                </button>
+
+                                {/* Cuisine Options */}
+                                {expandedMeal === meal && (
+                                    <div className="mt-2 p-3 bg-dark-elevated border border-dark-border rounded-xl animate-fade-in">
+                                        {/* Custom Input */}
+                                        <div className="flex gap-2 mb-3">
+                                            <input
+                                                type="text"
+                                                value={customInput}
+                                                onChange={(e) => setCustomInput(e.target.value)}
+                                                placeholder="Type custom cuisine..."
+                                                className="flex-1 px-3 py-2 bg-dark-card border border-dark-border rounded-lg text-white text-sm placeholder:text-gray-600"
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    if (customInput.trim()) {
+                                                        updateCuisine(meal, customInput.trim());
+                                                        // Add to custom cuisines if not already in list
+                                                        if (!CUISINES.includes(customInput.trim()) &&
+                                                            !preferences.customCuisines.includes(customInput.trim())) {
+                                                            setPreferences(prev => ({
+                                                                ...prev,
+                                                                customCuisines: [...prev.customCuisines, customInput.trim()]
+                                                            }));
+                                                        }
+                                                        setCustomInput('');
+                                                    }
+                                                }}
+                                                className="px-3 py-2 bg-white text-black rounded-lg"
+                                            >
+                                                <Plus className="w-4 h-4" />
+                                            </button>
+                                        </div>
+
+                                        {/* Preset + Custom Cuisines */}
+                                        <div className="grid grid-cols-2 gap-2">
+                                            {[...CUISINES, ...preferences.customCuisines].map((cuisine) => (
+                                                <button
+                                                    key={cuisine}
+                                                    onClick={() => updateCuisine(meal, cuisine)}
+                                                    className={`p-3 rounded-lg text-sm text-left transition-colors ${preferences.cuisinePreferences[meal] === cuisine
+                                                        ? 'bg-white text-black'
+                                                        : 'bg-dark-card text-gray-300 hover:bg-dark-border'
+                                                        }`}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <span>{cuisine}</span>
+                                                        {preferences.cuisinePreferences[meal] === cuisine && (
+                                                            <Check className="w-4 h-4" />
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </section>
+
+                {/* Auto Delete */}
+                <section className="mb-8">
+                    <h2 className="text-sm font-medium text-gray-500 mb-3">Data Management</h2>
+                    <div className="p-4 bg-dark-card border border-dark-border rounded-xl">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-white text-sm">Auto-delete cooklog entries</p>
+                                <p className="text-gray-500 text-xs">Remove entries older than</p>
+                            </div>
+                            <select
+                                value={preferences.autoDeleteDays}
+                                onChange={(e) => setPreferences(prev => ({
+                                    ...prev,
+                                    autoDeleteDays: Number(e.target.value)
+                                }))}
+                                className="bg-dark-elevated border border-dark-border rounded-lg px-3 py-2 text-sm text-white"
+                            >
+                                <option value={7}>7 days</option>
+                                <option value={30}>30 days</option>
+                                <option value={90}>90 days</option>
+                                <option value={0}>Never</option>
+                            </select>
+                        </div>
+                    </div>
+                </section>
+
+                {/* Reset */}
+                <button
+                    onClick={() => {
+                        setPreferences(DEFAULT_PREFERENCES);
+                        detectLocation();
+                    }}
+                    className="w-full py-3 bg-dark-card border border-dark-border rounded-xl text-gray-400 text-sm"
+                >
+                    Reset to Defaults
+                </button>
 
             </>)}
         </div>

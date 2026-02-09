@@ -139,8 +139,8 @@ export default function PersonalizeSheet({
                                     key={style.value}
                                     onClick={() => setCookingStyle(style.value)}
                                     className={`p-3 rounded-xl text-left transition-colors ${cookingStyle === style.value
-                                            ? 'bg-indigo-900/50 border border-indigo-600'
-                                            : 'bg-gray-800/50 border border-gray-700'
+                                        ? 'bg-indigo-900/50 border border-indigo-600'
+                                        : 'bg-gray-800/50 border border-gray-700'
                                         }`}
                                 >
                                     <div className="flex items-center gap-2 mb-1">
@@ -167,8 +167,8 @@ export default function PersonalizeSheet({
                                 key={meal}
                                 onClick={() => setMealTime(meal)}
                                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${mealTime === meal
-                                        ? 'bg-gray-700 text-white'
-                                        : 'bg-gray-800/50 text-gray-400 border border-gray-700'
+                                    ? 'bg-gray-700 text-white'
+                                    : 'bg-gray-800/50 text-gray-400 border border-gray-700'
                                     }`}
                             >
                                 {mealTime === meal && <Check className="w-3 h-3 inline mr-1" />}
@@ -187,8 +187,8 @@ export default function PersonalizeSheet({
                                 key={option}
                                 onClick={() => setDietary(option)}
                                 className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${dietary === option
-                                        ? 'bg-gray-700 text-white'
-                                        : 'bg-gray-800/50 text-gray-400 border border-gray-700'
+                                    ? 'bg-gray-700 text-white'
+                                    : 'bg-gray-800/50 text-gray-400 border border-gray-700'
                                     }`}
                             >
                                 {dietary === option && <Check className="w-3 h-3 inline mr-1" />}
@@ -208,8 +208,8 @@ export default function PersonalizeSheet({
                                 key={option}
                                 onClick={() => setAgeGroup(option)}
                                 className={`px-3 py-2 rounded-full text-sm font-medium transition-colors ${ageGroup === option
-                                        ? 'bg-gray-700 text-white'
-                                        : 'bg-gray-800/50 text-gray-400 border border-gray-700'
+                                    ? 'bg-gray-700 text-white'
+                                    : 'bg-gray-800/50 text-gray-400 border border-gray-700'
                                     }`}
                             >
                                 {ageGroup === option && <User className="w-3 h-3 inline mr-1" />}
@@ -257,7 +257,7 @@ export default function PersonalizeSheet({
                     className="w-full py-4 bg-indigo-900/50 hover:bg-indigo-900/70 border border-indigo-800 rounded-2xl text-white font-medium flex items-center justify-center gap-2 transition-colors"
                 >
                     <Sparkles className="w-4 h-4" />
-                    Rethink Dishes
+                    Let's Cook
                 </button>
             </div>
         </div>

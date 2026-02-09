@@ -221,7 +221,7 @@ function RecipesContent() {
                 className="w-full mt-6 py-4 bg-dark-card border border-dark-border rounded-xl text-white font-medium flex items-center justify-center gap-2"
             >
                 <Shuffle className="w-4 h-4" />
-                Rethink Dishes
+                Let's Cook
             </button>
         </div>
     );
