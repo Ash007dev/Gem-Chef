@@ -65,32 +65,53 @@ export class GeminiLiveSession {
             // Create system instruction for cooking context
             const systemInstruction = this.buildSystemInstruction();
 
-            // Connect to Live API
-            this.session = await this.ai.live.connect({
-                model: 'gemini-2.5-flash-native-audio-preview-12-2025',
-                config: {
-                    responseModalities: [Modality.AUDIO],
-                    systemInstruction: systemInstruction,
-                },
-                callbacks: {
-                    onopen: () => {
-                        console.log('Connected to Gemini Live');
-                        this.isConnected = true;
-                        this.callbacks.onConnected();
-                    },
-                    onmessage: (message: any) => this.handleMessage(message),
-                    onerror: (error: any) => {
-                        console.error('Live API error:', error);
-                        this.callbacks.onError(error.message || 'Connection error');
-                    },
-                    onclose: (event: any) => {
-                        console.log('Disconnected from Gemini Live. Code:', event?.code, 'Reason:', event?.reason);
-                        this.isConnected = false;
-                        this.callbacks.onDisconnected();
-                    },
-                },
-            });
+            // Live API models to try in order
+            const liveModels = [
+                'gemini-2.5-flash-native-audio-preview-12-2025',
+                'gemini-2.0-flash-live-001',
+                'gemini-2.0-flash',
+            ];
 
+            // Try each live model until one connects
+            let connected = false;
+            let lastErr: any = null;
+            for (const liveModel of liveModels) {
+                try {
+                    console.log(`[GemChef Live] Trying ${liveModel}`);
+                    this.session = await this.ai.live.connect({
+                        model: liveModel,
+                        config: {
+                            responseModalities: [Modality.AUDIO],
+                            systemInstruction: systemInstruction,
+                        },
+                        callbacks: {
+                            onopen: () => {
+                                console.log(`Connected to Gemini Live (${liveModel})`);
+                                this.isConnected = true;
+                                this.callbacks.onConnected();
+                            },
+                            onmessage: (message: any) => this.handleMessage(message),
+                            onerror: (error: any) => {
+                                console.error('Live API error:', error);
+                                this.callbacks.onError(error.message || 'Connection error');
+                            },
+                            onclose: (event: any) => {
+                                console.log('Disconnected from Gemini Live. Code:', event?.code, 'Reason:', event?.reason);
+                                this.isConnected = false;
+                                this.callbacks.onDisconnected();
+                            },
+                        },
+                    });
+                    connected = true;
+                    console.log(`[GemChef Live] ✓ ${liveModel} connected`);
+                    break;
+                } catch (err: any) {
+                    console.warn(`[GemChef Live] ✗ ${liveModel} failed:`, err.message);
+                    lastErr = err;
+                }
+            }
+
+            if (!connected) throw lastErr || new Error('All live models failed');
             return true;
         } catch (error: any) {
             console.error('Failed to connect:', error);

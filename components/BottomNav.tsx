@@ -5,8 +5,8 @@ import { usePathname } from 'next/navigation';
 import { Home, Camera, BookOpen, Settings } from 'lucide-react';
 
 const navItems = [
-    { href: '/home', label: 'Home', icon: Home },
-    { href: '/', label: 'Scan', icon: Camera },
+    { href: '/', label: 'Home', icon: Home },
+    { href: '/scan', label: 'Scan', icon: Camera },
     { href: '/cooklog', label: 'Cooklog', icon: BookOpen },
     { href: '/preferences', label: 'Settings', icon: Settings },
 ];
@@ -25,6 +25,12 @@ export default function BottomNav() {
                         <Link
                             key={item.href}
                             href={item.href}
+                            onClick={() => {
+                                // Stop any ongoing speech when navigating away
+                                if (typeof window !== 'undefined' && window.speechSynthesis) {
+                                    window.speechSynthesis.cancel();
+                                }
+                            }}
                             className={`flex flex-col items-center justify-center gap-1 min-w-[64px] py-2 rounded-lg transition-colors ${isActive
                                     ? 'text-white'
                                     : 'text-gray-500 hover:text-gray-300'
