@@ -271,7 +271,9 @@ export async function generateRecipes(
             cuisine = 'Same as Location',
             ageGroup = 'Adult (20-59)',
             healthConditions = [],
-            allergies = []
+            allergies = [],
+            dishName,
+            description
         } = context;
 
         // Determine the cuisine to use
@@ -456,6 +458,8 @@ export async function generateRecipes(
         ${ageConstraint}
         ${healthConstraint}
         ${effectiveCuisine ? `- Cuisine/Region: ${effectiveCuisine}` : ''}
+        ${dishName ? `- SPECIFIC REQUEST: The user wants to cook "${dishName}"${description ? ` - ${description}` : ''}` : ''}
+        ${dishName ? '- PRIMITIVITY: These recipes MUST be variations/styles of the requested dish.' : ''}
         
         ${dietary === 'Veg' ? `*** EXTREMELY IMPORTANT DIETARY CONSTRAINT ***
         The user is VEGETARIAN. Every single one of the 9 recipes MUST be 100% vegetarian.
@@ -467,16 +471,18 @@ export async function generateRecipes(
         ${ageRecipeOverride ? ageRecipeOverride : `GENERATE 9 RECIPES TOTAL:
         
         FIRST 3 - REGIONAL SIGNATURE DISHES (isRegional: true):
-        ${effectiveCuisine ? `Top 3 must-try dishes from ${effectiveCuisine} cuisine. These are iconic, signature dishes of the region.` : 'Top 3 popular dishes from the user\'s region.'}
+        ${dishName ? `Top 3 authentic/regional variations of "${dishName}" from ${effectiveCuisine || 'various regions'}.` : effectiveCuisine ? `Top 3 must-try dishes from ${effectiveCuisine} cuisine. These are iconic, signature dishes of the region.` : 'Top 3 popular dishes from the user\'s region.'}
         
         NEXT 6 - REGULAR RECIPES based on "${style}" style:
-        ${style === 'Quick & Easy' ?
-                    '4. Super Quick (15 min), 5. Easy Weeknight, 6. No-Cook/Minimal, 7. One-Pan, 8. 5-Ingredient, 9. Microwave-Friendly' :
-                    style === 'Restaurant Style' ?
-                        '4. Fine Dining, 5. Professional Plating, 6. Complex Flavors, 7. Gourmet Fusion, 8. Chef\'s Special, 9. Signature Dish' :
-                        style === 'Healthy' ?
-                            '4. Low-Carb, 5. High-Protein, 6. Superfood Bowl, 7. Clean Eating, 8. Meal Prep Friendly, 9. Light & Fresh' :
-                            '4. Nostalgic Home Cooking, 5. Hearty One-Pot, 6. Creamy & Rich, 7. Fried Favorites, 8. Slow-Cooked, 9. Family Recipe Style'
+        ${dishName ? `Generate 6 more variations of "${dishName}" suitable for "${style}" style (e.g. quick version, healthy version, family style).` :
+                    style === 'Quick & Easy' ?
+
+                        '4. Super Quick (15 min), 5. Easy Weeknight, 6. No-Cook/Minimal, 7. One-Pan, 8. 5-Ingredient, 9. Microwave-Friendly' :
+                        style === 'Restaurant Style' ?
+                            '4. Fine Dining, 5. Professional Plating, 6. Complex Flavors, 7. Gourmet Fusion, 8. Chef\'s Special, 9. Signature Dish' :
+                            style === 'Healthy' ?
+                                '4. Low-Carb, 5. High-Protein, 6. Superfood Bowl, 7. Clean Eating, 8. Meal Prep Friendly, 9. Light & Fresh' :
+                                '4. Nostalgic Home Cooking, 5. Hearty One-Pot, 6. Creamy & Rich, 7. Fried Favorites, 8. Slow-Cooked, 9. Family Recipe Style'
                 }
         `}
 
