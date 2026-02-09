@@ -8,11 +8,16 @@ type DietaryPref = 'Veg' | 'Non-Veg' | 'Both';
 type MealType = 'Breakfast' | 'Brunch' | 'Lunch' | 'Snack' | 'Dinner';
 type AgeGroup = 'Baby (0-2)' | 'Toddler (2-5)' | 'Kid (5-12)' | 'Teen (13-19)' | 'Adult (20-59)' | 'Senior (60+)';
 
-// Health conditions
-type HealthCondition = 'Diabetes' | 'Hypertension' | 'High Cholesterol' | 'PCOD/PCOS' | 'Thyroid' | 'Heart Disease' | 'Kidney Issues';
+// Health conditions (including Indian-specific)
+type HealthCondition =
+    | 'Diabetes' | 'Hypertension' | 'High Cholesterol' | 'PCOD/PCOS' | 'Thyroid'
+    | 'Heart Disease' | 'Kidney Issues' | 'Uric Acid/Gout' | 'Fatty Liver'
+    | 'Gastritis/Acidity' | 'Lactose Intolerance' | 'Pregnancy' | 'Post-Surgery';
 
-// Common allergies
-type Allergy = 'Nuts' | 'Peanuts' | 'Dairy' | 'Gluten' | 'Eggs' | 'Shellfish' | 'Soy' | 'Fish' | 'Sesame';
+// Common allergies (including Indian ingredients)
+type Allergy =
+    | 'Nuts' | 'Peanuts' | 'Dairy' | 'Gluten' | 'Eggs' | 'Shellfish' | 'Soy' | 'Fish' | 'Sesame'
+    | 'Coconut' | 'Mustard' | 'Asafoetida (Hing)' | 'Tamarind' | 'Fenugreek (Methi)';
 
 interface Preferences {
     location: string;
@@ -56,6 +61,12 @@ const HEALTH_CONDITIONS: HealthCondition[] = [
     'Thyroid',
     'Heart Disease',
     'Kidney Issues',
+    'Uric Acid/Gout',
+    'Fatty Liver',
+    'Gastritis/Acidity',
+    'Lactose Intolerance',
+    'Pregnancy',
+    'Post-Surgery',
 ];
 
 const COMMON_ALLERGIES: Allergy[] = [
@@ -68,6 +79,11 @@ const COMMON_ALLERGIES: Allergy[] = [
     'Soy',
     'Fish',
     'Sesame',
+    'Coconut',
+    'Mustard',
+    'Asafoetida (Hing)',
+    'Tamarind',
+    'Fenugreek (Methi)',
 ];
 
 const CUISINES = [

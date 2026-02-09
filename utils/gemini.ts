@@ -268,28 +268,39 @@ export async function generateRecipes(
         The user has the following HEALTH CONDITIONS: ${healthConditions.join(', ')}
         
         Recipe requirements based on health conditions:
-        ${healthConditions.includes('Diabetes') ? '- DIABETES: Avoid high-sugar ingredients, white rice, white bread, potatoes. Prefer whole grains, low-GI foods. No desserts with refined sugar.' : ''}
+        ${healthConditions.includes('Diabetes') ? '- DIABETES: Avoid high-sugar ingredients, white rice, white bread, potatoes, maida. Prefer whole grains, millets, low-GI foods. No desserts with refined sugar or jaggery.' : ''}
         ${healthConditions.includes('Hypertension') ? '- HYPERTENSION: Minimize salt/sodium. Avoid pickles, papad, processed foods, soy sauce. Use herbs and spices for flavor instead.' : ''}
         ${healthConditions.includes('High Cholesterol') ? '- HIGH CHOLESTEROL: Avoid fried foods, ghee, butter, full-fat dairy, red meat, organ meats. Prefer olive oil, lean proteins.' : ''}
         ${healthConditions.includes('PCOD/PCOS') ? '- PCOD/PCOS: Avoid refined carbs, sugary foods, dairy. Include anti-inflammatory foods, lean proteins, fiber-rich ingredients.' : ''}
-        ${healthConditions.includes('Thyroid') ? '- THYROID: Limit cruciferous vegetables (raw cabbage, broccoli), soy products. Include selenium-rich foods, iodized salt in moderation.' : ''}
+        ${healthConditions.includes('Thyroid') ? '- THYROID: Limit cruciferous vegetables (raw cabbage, broccoli, cauliflower), soy products. Include selenium-rich foods, iodized salt in moderation.' : ''}
         ${healthConditions.includes('Heart Disease') ? '- HEART DISEASE: No fried foods, limit sodium, avoid saturated fats. Include omega-3 rich foods, whole grains, vegetables.' : ''}
         ${healthConditions.includes('Kidney Issues') ? '- KIDNEY ISSUES: Limit potassium (bananas, potatoes, tomatoes), phosphorus (dairy, nuts), and sodium. Control protein portions.' : ''}
+        ${healthConditions.includes('Uric Acid/Gout') ? '- URIC ACID/GOUT: Avoid high-purine foods: organ meats, red meat, shellfish, sardines, anchovies, mushrooms, spinach, cauliflower, rajma, chole. Limit dal intake. No alcohol-based cooking.' : ''}
+        ${healthConditions.includes('Fatty Liver') ? '- FATTY LIVER: No fried foods, avoid added sugars, limit refined carbs. No alcohol. Prefer high-fiber foods, lean proteins, green vegetables.' : ''}
+        ${healthConditions.includes('Gastritis/Acidity') ? '- GASTRITIS/ACIDITY: Avoid spicy foods, excessive chili, too much oil. No raw onion, garlic on empty stomach. Avoid citrus, tomatoes, vinegar. Prefer mild, easy-to-digest foods.' : ''}
+        ${healthConditions.includes('Lactose Intolerance') ? '- LACTOSE INTOLERANCE: No milk, cream, paneer, khoya, rabri. Avoid milk-based desserts. Curd/yogurt in small amounts may be okay. Use plant-based alternatives.' : ''}
+        ${healthConditions.includes('Pregnancy') ? '- PREGNANCY: No raw/undercooked foods, unpasteurized dairy, raw papaya, excessive caffeine. Avoid ajinomoto, artificial colors. Include iron-rich foods, folate, calcium.' : ''}
+        ${healthConditions.includes('Post-Surgery') ? '- POST-SURGERY: Easy-to-digest foods only. No heavy, fried, spicy foods. Soft, well-cooked meals. Include protein for healing. Avoid gas-forming foods initially.' : ''}
         ` : ''}
         
         ${allergies.length > 0 ? `
         The user has the following ALLERGIES: ${allergies.join(', ')}
         
         ABSOLUTELY DO NOT include these ingredients or any derivatives:
-        ${allergies.includes('Nuts') ? '- NO NUTS: almonds, cashews, walnuts, pistachios, hazelnuts, pecans, macadamia, nut oils, nut butters' : ''}
-        ${allergies.includes('Peanuts') ? '- NO PEANUTS: peanuts, peanut oil, peanut butter, groundnut' : ''}
-        ${allergies.includes('Dairy') ? '- NO DAIRY: milk, cream, butter, ghee, cheese, paneer, yogurt, curd, whey, casein' : ''}
-        ${allergies.includes('Gluten') ? '- NO GLUTEN: wheat, barley, rye, semolina, rava, maida, regular soy sauce, most bread/pasta. Use rice, millet, or certified gluten-free alternatives.' : ''}
+        ${allergies.includes('Nuts') ? '- NO NUTS: almonds, cashews, walnuts, pistachios, hazelnuts, pecans, macadamia, nut oils, nut butters, badam, kaju' : ''}
+        ${allergies.includes('Peanuts') ? '- NO PEANUTS: peanuts, peanut oil, peanut butter, groundnut, moongphali' : ''}
+        ${allergies.includes('Dairy') ? '- NO DAIRY: milk, cream, butter, ghee, cheese, paneer, yogurt, curd, whey, casein, khoya, rabri, malai' : ''}
+        ${allergies.includes('Gluten') ? '- NO GLUTEN: wheat, barley, rye, semolina, rava, maida, regular soy sauce, most bread/pasta/roti. Use rice, millets (bajra, jowar, ragi), or certified gluten-free alternatives.' : ''}
         ${allergies.includes('Eggs') ? '- NO EGGS: eggs, mayonnaise, egg noodles, dishes with egg wash or egg binding' : ''}
-        ${allergies.includes('Shellfish') ? '- NO SHELLFISH: shrimp, prawns, crab, lobster, oysters, mussels, clams, scallops' : ''}
+        ${allergies.includes('Shellfish') ? '- NO SHELLFISH: shrimp, prawns, crab, lobster, oysters, mussels, clams, scallops, jhinga' : ''}
         ${allergies.includes('Soy') ? '- NO SOY: soy sauce, tofu, tempeh, edamame, soy milk, soy lecithin' : ''}
         ${allergies.includes('Fish') ? '- NO FISH: any fish, fish sauce, fish oil, anchovy paste' : ''}
-        ${allergies.includes('Sesame') ? '- NO SESAME: sesame seeds, tahini, sesame oil, til' : ''}
+        ${allergies.includes('Sesame') ? '- NO SESAME: sesame seeds, tahini, sesame oil, til, til ka tel' : ''}
+        ${allergies.includes('Coconut') ? '- NO COCONUT: coconut, coconut milk, coconut oil, coconut cream, nariyal, copra' : ''}
+        ${allergies.includes('Mustard') ? '- NO MUSTARD: mustard seeds, mustard oil, sarson, rai, mustard paste' : ''}
+        ${allergies.includes('Asafoetida (Hing)') ? '- NO ASAFOETIDA: hing, heeng - commonly used in Indian tempering' : ''}
+        ${allergies.includes('Tamarind') ? '- NO TAMARIND: tamarind, imli, tamarind paste, kokum' : ''}
+        ${allergies.includes('Fenugreek (Methi)') ? '- NO FENUGREEK: methi seeds, methi leaves, kasuri methi, fenugreek powder' : ''}
         
         Double-check EVERY ingredient to ensure no allergens are present, including hidden sources.
         ` : ''}
