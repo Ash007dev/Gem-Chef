@@ -142,8 +142,9 @@ export default function PlateToRecipePage() {
 
     const startCooking = () => {
         if (recipe) {
+            // Save to localStorage - cook page will convert the format
             localStorage.setItem('plate_to_recipe_current', JSON.stringify(recipe));
-            router.push('/cook?source=plate-to-recipe');
+            router.push('/cook');
         }
     };
 

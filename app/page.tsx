@@ -15,6 +15,7 @@ import {
     Leaf,
     Utensils,
     ImageIcon,
+    TrendingUp,
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -177,6 +178,16 @@ export default function LandingPage() {
                         <ImageIcon className="w-5 h-5 text-orange-400 mb-3" />
                         <h4 className="text-white text-sm font-medium mb-0.5">Plate to Recipe</h4>
                         <p className="text-gray-500 text-xs">Photo to full recipe</p>
+                    </button>
+
+                    {/* Analytics */}
+                    <button
+                        onClick={() => router.push('/analytics')}
+                        className="bg-dark-card border border-dark-border rounded-xl p-4 text-left hover:bg-dark-elevated active:scale-[0.97] transition-all"
+                    >
+                        <TrendingUp className="w-5 h-5 text-green-400 mb-3" />
+                        <h4 className="text-white text-sm font-medium mb-0.5">Analytics</h4>
+                        <p className="text-gray-500 text-xs">Track your progress</p>
                     </button>
                 </div>
             </section>

@@ -85,19 +85,26 @@ function FailureModal({
     );
 }
 
-// Completion Modal
+// Completion Modal with Share Feature
 function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () => void }) {
+    const [showShare, setShowShare] = useState(false);
+    const [dishPhoto, setDishPhoto] = useState<string | null>(null);
+    const [isGeneratingCard, setIsGeneratingCard] = useState(false);
+    const [shareCardUrl, setShareCardUrl] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+
     // Save to cooklog (prevent duplicates - only add once per recipe per session)
     useEffect(() => {
         const savedLog = localStorage.getItem('cooklog');
         const cooklog = savedLog ? JSON.parse(savedLog) : [];
-        
+
         // Check if this exact recipe was already logged today
         const today = new Date().toDateString();
         const alreadyLogged = cooklog.some(
             (entry: any) => entry.id === recipe.id && new Date(entry.cookedAt).toDateString() === today
         );
-        
+
         if (!alreadyLogged) {
             cooklog.unshift({
                 ...recipe,
@@ -106,6 +113,249 @@ function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () =>
             localStorage.setItem('cooklog', JSON.stringify(cooklog.slice(0, 50)));
         }
     }, [recipe]);
+
+    const handlePhotoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            setDishPhoto(e.target?.result as string);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const generateShareCard = async () => {
+        if (!dishPhoto || !canvasRef.current) return;
+
+        setIsGeneratingCard(true);
+
+        try {
+            const canvas = canvasRef.current;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            // Card dimensions (Instagram-friendly 1:1)
+            canvas.width = 1080;
+            canvas.height = 1080;
+
+            // Background gradient
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#1a1a1a');
+            gradient.addColorStop(1, '#0a0a0a');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Load and draw dish photo
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+                img.src = dishPhoto;
+            });
+
+            // Draw circular photo with border
+            const photoSize = 600;
+            const photoX = (canvas.width - photoSize) / 2;
+            const photoY = 120;
+
+            // White border
+            ctx.beginPath();
+            ctx.arc(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2 + 8, 0, Math.PI * 2);
+            ctx.fillStyle = 'rgba(255,255,255,0.2)';
+            ctx.fill();
+
+            // Clip to circle and draw image
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(photoX + photoSize / 2, photoY + photoSize / 2, photoSize / 2, 0, Math.PI * 2);
+            ctx.clip();
+
+            // Cover fit the image
+            const imgRatio = img.width / img.height;
+            let sx = 0, sy = 0, sw = img.width, sh = img.height;
+            if (imgRatio > 1) {
+                sx = (img.width - img.height) / 2;
+                sw = img.height;
+            } else {
+                sy = (img.height - img.width) / 2;
+                sh = img.width;
+            }
+            ctx.drawImage(img, sx, sy, sw, sh, photoX, photoY, photoSize, photoSize);
+            ctx.restore();
+
+            // Recipe title
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 48px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.textAlign = 'center';
+            const title = recipe.title.length > 25 ? recipe.title.substring(0, 25) + '...' : recipe.title;
+            ctx.fillText(title, canvas.width / 2, photoY + photoSize + 80);
+
+            // Cook time and servings
+            ctx.fillStyle = '#888888';
+            ctx.font = '32px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.fillText(`${recipe.totalTime} • ${recipe.servings}`, canvas.width / 2, photoY + photoSize + 130);
+
+            // Key ingredients (max 3)
+            const keyIngredients = recipe.ingredients.provided.slice(0, 3).map(ing => {
+                // Extract just the ingredient name (before weight/quantity details)
+                const match = ing.match(/^[\d\s]*(?:cup|tbsp|tsp|g|kg|ml|l|piece|pcs|medium|large|small)?\s*(.+?)(?:\s*\(|,|$)/i);
+                return match ? match[1].trim() : ing.split('(')[0].trim();
+            }).join(' • ');
+            ctx.fillStyle = '#666666';
+            ctx.font = '28px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.fillText(keyIngredients.substring(0, 50), canvas.width / 2, photoY + photoSize + 180);
+
+            // Branding
+            ctx.fillStyle = '#444444';
+            ctx.font = '24px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+            ctx.fillText('Made with SmartChef', canvas.width / 2, canvas.height - 50);
+
+            // Convert to data URL
+            const dataUrl = canvas.toDataURL('image/png');
+            setShareCardUrl(dataUrl);
+
+        } catch (err) {
+            console.error('Failed to generate share card:', err);
+        } finally {
+            setIsGeneratingCard(false);
+        }
+    };
+
+    // Generate card when photo is selected
+    useEffect(() => {
+        if (dishPhoto) {
+            generateShareCard();
+        }
+    }, [dishPhoto]);
+
+    const handleShare = async (platform: 'native' | 'download') => {
+        if (!shareCardUrl) return;
+
+        if (platform === 'download') {
+            // Download image
+            const link = document.createElement('a');
+            link.download = `${recipe.title.replace(/\s+/g, '_')}_SmartChef.png`;
+            link.href = shareCardUrl;
+            link.click();
+        } else if (platform === 'native' && navigator.share) {
+            try {
+                // Convert data URL to blob
+                const response = await fetch(shareCardUrl);
+                const blob = await response.blob();
+                const file = new File([blob], `${recipe.title}_SmartChef.png`, { type: 'image/png' });
+
+                await navigator.share({
+                    title: `I made ${recipe.title}!`,
+                    text: `Just cooked ${recipe.title} using SmartChef! 🍳`,
+                    files: [file]
+                });
+            } catch (err) {
+                // Fallback to download if share fails
+                handleShare('download');
+            }
+        }
+    };
+
+    if (showShare) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 animate-fade-in overflow-y-auto">
+                <div className="bg-dark-card rounded-2xl p-6 w-full max-w-sm border border-dark-border animate-scale-in my-8">
+                    <h3 className="text-lg font-semibold text-center text-white mb-4">
+                        Share Your Creation
+                    </h3>
+
+                    {!dishPhoto ? (
+                        <>
+                            <p className="text-center text-gray-400 text-sm mb-6">
+                                Take a photo of your dish to create a shareable recipe card!
+                            </p>
+                            <input
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                capture="environment"
+                                onChange={handlePhotoSelect}
+                                className="hidden"
+                            />
+                            <button
+                                onClick={() => fileInputRef.current?.click()}
+                                className="w-full py-4 bg-white text-black rounded-xl font-semibold flex items-center justify-center gap-2 mb-3"
+                            >
+                                <Camera className="w-5 h-5" />
+                                Take Photo
+                            </button>
+                            <button
+                                onClick={() => setShowShare(false)}
+                                className="w-full py-3 text-gray-400"
+                            >
+                                Skip
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            {/* Preview */}
+                            <div className="mb-4 rounded-xl overflow-hidden">
+                                {isGeneratingCard ? (
+                                    <div className="aspect-square bg-dark-elevated flex items-center justify-center">
+                                        <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    </div>
+                                ) : shareCardUrl ? (
+                                    <img src={shareCardUrl} alt="Share card preview" className="w-full" />
+                                ) : null}
+                            </div>
+
+                            {/* Share options */}
+                            {shareCardUrl && (
+                                <div className="space-y-3">
+                                    {/* Native share (WhatsApp, Instagram, etc.) */}
+                                    {'share' in navigator && (
+                                        <button
+                                            onClick={() => handleShare('native')}
+                                            className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-xl font-semibold flex items-center justify-center gap-2"
+                                        >
+                                            Share to App
+                                        </button>
+                                    )}
+
+                                    {/* Download */}
+                                    <button
+                                        onClick={() => handleShare('download')}
+                                        className="w-full py-4 bg-dark-elevated border border-dark-border text-white rounded-xl font-medium flex items-center justify-center gap-2"
+                                    >
+                                        Save to Gallery
+                                    </button>
+
+                                    {/* Retake */}
+                                    <button
+                                        onClick={() => {
+                                            setDishPhoto(null);
+                                            setShareCardUrl(null);
+                                        }}
+                                        className="w-full py-3 text-gray-400 text-sm"
+                                    >
+                                        Retake Photo
+                                    </button>
+
+                                    {/* Done */}
+                                    <button
+                                        onClick={onFinish}
+                                        className="w-full py-3 text-gray-500 text-sm"
+                                    >
+                                        Done
+                                    </button>
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {/* Hidden canvas for generating share card */}
+                    <canvas ref={canvasRef} className="hidden" />
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 animate-fade-in">
@@ -120,8 +370,15 @@ function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () =>
                     You've completed {recipe.title}. Added to your cooklog.
                 </p>
                 <button
+                    onClick={() => setShowShare(true)}
+                    className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold mb-3 flex items-center justify-center gap-2"
+                >
+                    <Camera className="w-5 h-5" />
+                    Share Your Dish
+                </button>
+                <button
                     onClick={onFinish}
-                    className="w-full py-3 bg-white text-black rounded-xl font-semibold"
+                    className="w-full py-3 bg-dark-elevated border border-dark-border text-white rounded-xl font-medium"
                 >
                     Done
                 </button>
@@ -280,13 +537,46 @@ function CookContent() {
         };
     }, []);
 
-    // Load recipe from sessionStorage
+    // Load recipe from sessionStorage or localStorage (for plate-to-recipe)
     useEffect(() => {
-        const stored = sessionStorage.getItem('currentRecipe');
-        if (stored) {
-            setRecipe(JSON.parse(stored));
-        } else {
+        // First check sessionStorage (main flow)
+        let stored = sessionStorage.getItem('currentRecipe');
+
+        // Fallback: check localStorage for plate-to-recipe
+        if (!stored) {
+            const plateRecipe = localStorage.getItem('plate_to_recipe_current');
+            if (plateRecipe) {
+                try {
+                    const parsed = JSON.parse(plateRecipe);
+                    // Convert plate-to-recipe format to cook page format
+                    const cookRecipe = {
+                        id: `plate-${Date.now()}`,
+                        title: parsed.title,
+                        description: parsed.description,
+                        prepTime: parsed.prepTime || '15 min',
+                        cookTime: parsed.cookTime || '30 min',
+                        totalTime: parsed.totalTime || `${parseInt(parsed.prepTime || '15') + parseInt(parsed.cookTime || '30')} min`,
+                        servings: typeof parsed.servings === 'number' ? `${parsed.servings} servings` : (parsed.servings || '2 servings'),
+                        difficulty: parsed.difficulty || 'Medium',
+                        calories: parsed.calories || 'N/A',
+                        type: 'traditional' as const,
+                        ingredients: parsed.ingredients?.provided
+                            ? parsed.ingredients
+                            : { provided: parsed.ingredients || [], shoppingList: [] },
+                        steps: parsed.steps || [],
+                        mealPrep: parsed.tips || parsed.mealPrep || []
+                    };
+                    setRecipe(cookRecipe);
+                    // Clear the localStorage after loading
+                    localStorage.removeItem('plate_to_recipe_current');
+                    return;
+                } catch (e) {
+                    console.error('Failed to parse plate recipe:', e);
+                }
+            }
             router.push('/scan');
+        } else {
+            setRecipe(JSON.parse(stored));
         }
     }, [router]);
 

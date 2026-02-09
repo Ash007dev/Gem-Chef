@@ -19,6 +19,12 @@ type Allergy =
     | 'Nuts' | 'Peanuts' | 'Dairy' | 'Gluten' | 'Eggs' | 'Shellfish' | 'Soy' | 'Fish' | 'Sesame'
     | 'Coconut' | 'Mustard' | 'Asafoetida (Hing)' | 'Tamarind' | 'Fenugreek (Methi)';
 
+// Voice language for Gemini Live
+type VoiceLanguage =
+    | 'English' | 'Hindi' | 'Tamil' | 'Telugu' | 'Kannada' | 'Malayalam'
+    | 'Marathi' | 'Bengali' | 'Gujarati' | 'Punjabi'
+    | 'Spanish' | 'French' | 'German' | 'Japanese' | 'Korean' | 'Mandarin';
+
 interface Preferences {
     location: string;
     dietary: DietaryPref;
@@ -31,7 +37,28 @@ interface Preferences {
     healthConditions: HealthCondition[];
     allergies: Allergy[];
     customAllergies: string[];
+    // Voice settings
+    voiceLanguage: VoiceLanguage;
 }
+
+const VOICE_LANGUAGES: { code: VoiceLanguage; label: string; native: string }[] = [
+    { code: 'English', label: 'English', native: 'English' },
+    { code: 'Hindi', label: 'Hindi', native: 'हिन्दी' },
+    { code: 'Tamil', label: 'Tamil', native: 'தமிழ்' },
+    { code: 'Telugu', label: 'Telugu', native: 'తెలుగు' },
+    { code: 'Kannada', label: 'Kannada', native: 'ಕನ್ನಡ' },
+    { code: 'Malayalam', label: 'Malayalam', native: 'മലയാളം' },
+    { code: 'Marathi', label: 'Marathi', native: 'मराठी' },
+    { code: 'Bengali', label: 'Bengali', native: 'বাংলা' },
+    { code: 'Gujarati', label: 'Gujarati', native: 'ગુજરાતી' },
+    { code: 'Punjabi', label: 'Punjabi', native: 'ਪੰਜਾਬੀ' },
+    { code: 'Spanish', label: 'Spanish', native: 'Español' },
+    { code: 'French', label: 'French', native: 'Français' },
+    { code: 'German', label: 'German', native: 'Deutsch' },
+    { code: 'Japanese', label: 'Japanese', native: '日本語' },
+    { code: 'Korean', label: 'Korean', native: '한국어' },
+    { code: 'Mandarin', label: 'Mandarin', native: '中文' },
+];
 
 const DEFAULT_PREFERENCES: Preferences = {
     location: '',
@@ -51,6 +78,8 @@ const DEFAULT_PREFERENCES: Preferences = {
     healthConditions: [],
     allergies: [],
     customAllergies: [],
+    // Voice defaults
+    voiceLanguage: 'English',
 };
 
 const HEALTH_CONDITIONS: HealthCondition[] = [
@@ -414,6 +443,46 @@ export default function PreferencesPage() {
                         <div className="mt-4 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
                             <p className="text-green-400 text-xs">
                                 Recipes will automatically avoid or substitute ingredients unsuitable for your health profile.
+                            </p>
+                        </div>
+                    )}
+                </section>
+
+                {/* Voice Language Section */}
+                <section className="mb-8">
+                    <h2 className="text-sm font-medium text-gray-500 mb-1">Voice Language</h2>
+                    <p className="text-xs text-gray-600 mb-4">Live cooking assistant will speak in this language</p>
+
+                    <div className="flex flex-wrap gap-2">
+                        {VOICE_LANGUAGES.map((lang) => {
+                            const isSelected = preferences.voiceLanguage === lang.code;
+                            return (
+                                <button
+                                    key={lang.code}
+                                    onClick={() => {
+                                        setPreferences(prev => ({
+                                            ...prev,
+                                            voiceLanguage: lang.code
+                                        }));
+                                    }}
+                                    className={`px-3 py-2 rounded-lg text-sm transition-colors ${isSelected
+                                        ? 'bg-purple-500/20 border border-purple-500/40 text-purple-400'
+                                        : 'bg-dark-card border border-dark-border text-gray-400'
+                                        }`}
+                                >
+                                    <span className="font-medium">{lang.label}</span>
+                                    {lang.native !== lang.label && (
+                                        <span className="ml-1 text-xs opacity-70">{lang.native}</span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {preferences.voiceLanguage !== 'English' && (
+                        <div className="mt-3 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                            <p className="text-purple-400 text-xs">
+                                Live Mode will respond in {preferences.voiceLanguage}. You can speak in {preferences.voiceLanguage} or English.
                             </p>
                         </div>
                     )}

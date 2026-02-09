@@ -13,9 +13,13 @@ import {
     Volume2,
     VolumeX,
     ChefHat,
-    Loader2
+    Loader2,
+    Timer,
+    Eye,
+    EyeOff
 } from 'lucide-react';
 import { GeminiLiveSession, AudioPlayer, LiveSessionConfig } from '@/utils/gemini-live';
+import AROverlay, { useARAnnotations } from './AROverlay';
 
 interface LiveCookingOverlayProps {
     isOpen: boolean;
@@ -51,6 +55,11 @@ export default function LiveCookingOverlay({
     const [transcript, setTranscript] = useState<string[]>([]);
     const [errorMessage, setErrorMessage] = useState('');
 
+    // AR Overlay State
+    const [isAREnabled, setIsAREnabled] = useState(true);
+    const [showStepGuide, setShowStepGuide] = useState(true);
+    const arAnnotations = useARAnnotations();
+
     // Refs
     const videoRef = useRef<HTMLVideoElement>(null);
     const sessionRef = useRef<GeminiLiveSession | null>(null);
@@ -80,12 +89,25 @@ export default function LiveCookingOverlay({
         setConnectionState('connecting');
         setErrorMessage('');
 
+        // Get voice language preference from localStorage
+        let voiceLanguage = 'English';
+        try {
+            const prefs = localStorage.getItem('smartchef_preferences');
+            if (prefs) {
+                const parsed = JSON.parse(prefs);
+                voiceLanguage = parsed.voiceLanguage || 'English';
+            }
+        } catch (e) {
+            console.error('Failed to read voice language preference:', e);
+        }
+
         const config: LiveSessionConfig = {
             recipeTitle,
             currentStep,
             stepNumber,
             totalSteps,
-            ingredients
+            ingredients,
+            voiceLanguage
         };
 
         const session = new GeminiLiveSession({
@@ -192,6 +214,19 @@ export default function LiveCookingOverlay({
                 {/* Overlay gradient */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
 
+                {/* AR Overlay */}
+                {isAREnabled && (
+                    <AROverlay
+                        annotations={arAnnotations.annotations}
+                        onDismiss={arAnnotations.removeAnnotation}
+                        currentStep={currentStep}
+                        stepNumber={stepNumber}
+                        totalSteps={totalSteps}
+                        showStepGuide={showStepGuide && isFullScreen}
+                        activeTimer={arAnnotations.activeTimer}
+                    />
+                )}
+
                 {/* Top Bar */}
                 <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -215,6 +250,14 @@ export default function LiveCookingOverlay({
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {/* AR Toggle */}
+                        <button
+                            onClick={() => setIsAREnabled(!isAREnabled)}
+                            className={`p-2 rounded-full ${isAREnabled ? 'bg-cyan-500/80 text-white' : 'bg-black/50 text-gray-400'}`}
+                            title={isAREnabled ? 'Disable AR Overlay' : 'Enable AR Overlay'}
+                        >
+                            {isAREnabled ? <Eye className="w-5 h-5" /> : <EyeOff className="w-5 h-5" />}
+                        </button>
                         <button
                             onClick={() => setIsFullScreen(!isFullScreen)}
                             className="p-2 bg-black/50 rounded-full text-white"
@@ -312,6 +355,26 @@ export default function LiveCookingOverlay({
                         >
                             {isSpeakerOn ? <Volume2 className="w-6 h-6" /> : <VolumeX className="w-6 h-6" />}
                         </button>
+
+                        {/* Timer Button */}
+                        {isAREnabled && (
+                            <button
+                                onClick={() => {
+                                    // Quick timer presets
+                                    const presets = [30, 60, 120, 180, 300];
+                                    const current = arAnnotations.activeTimer?.total;
+                                    const idx = current ? presets.indexOf(current) : -1;
+                                    const next = presets[(idx + 1) % presets.length];
+                                    arAnnotations.startTimer('Timer', next);
+                                }}
+                                className={`p-4 rounded-full transition-colors ${arAnnotations.activeTimer
+                                        ? 'bg-amber-500 text-white animate-pulse'
+                                        : 'bg-gray-700 text-white'
+                                    }`}
+                            >
+                                <Timer className="w-6 h-6" />
+                            </button>
+                        )}
                     </div>
 
                     {/* Step info in full screen */}
