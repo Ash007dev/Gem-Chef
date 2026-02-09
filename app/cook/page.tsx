@@ -17,13 +17,21 @@ import {
     Users,
     Play,
     Pause,
-    Video
+    Video,
+    RefreshCw,
+    Sparkles,
+    Loader2,
+    Home,
+    Lightbulb
 } from 'lucide-react';
 import {
     verifyCookingStep,
     fileToBase64,
     type Recipe,
-    type StepVerificationResult
+    type StepVerificationResult,
+    getIngredientSubstitutes,
+    type SubstitutionResult,
+    type IngredientSubstitute
 } from '@/utils/gemini';
 import LiveCookingOverlay from '@/components/LiveCookingOverlay';
 
@@ -84,6 +92,171 @@ function FailureModal({
         </div>
     );
 }
+
+// Substitution Genius Modal
+function SubstitutionModal({
+    ingredient,
+    recipeName,
+    onClose,
+    onSelect
+}: {
+    ingredient: string;
+    recipeName: string;
+    onClose: () => void;
+    onSelect: (substitute: IngredientSubstitute) => void;
+}) {
+    const [loading, setLoading] = useState(true);
+    const [result, setResult] = useState<SubstitutionResult | null>(null);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        async function fetchSubstitutes() {
+            try {
+                setLoading(true);
+                setError(null);
+
+                // Get user preferences for dietary restrictions
+                const prefsStr = localStorage.getItem('smartchef_preferences');
+                const prefs = prefsStr ? JSON.parse(prefsStr) : {};
+
+                const substitutes = await getIngredientSubstitutes(ingredient, {
+                    recipeName,
+                    dietaryRestrictions: prefs.diet ? [prefs.diet] : [],
+                    allergies: prefs.allergies || []
+                });
+
+                setResult(substitutes);
+            } catch (err) {
+                console.error('Failed to get substitutes:', err);
+                setError('Failed to find substitutes. Please try again.');
+            } finally {
+                setLoading(false);
+            }
+        }
+
+        fetchSubstitutes();
+    }, [ingredient, recipeName]);
+
+    const getTypeIcon = (type: string) => {
+        switch (type) {
+            case 'common': return <Home className="w-4 h-4" />;
+            case 'dietary': return <Sparkles className="w-4 h-4" />;
+            case 'creative': return <Lightbulb className="w-4 h-4" />;
+            default: return <RefreshCw className="w-4 h-4" />;
+        }
+    };
+
+    const getTypeColor = (type: string) => {
+        switch (type) {
+            case 'common': return 'bg-green-500/20 text-green-400 border-green-500/30';
+            case 'dietary': return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+            case 'creative': return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+            default: return 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end justify-center p-0 bg-black/80 animate-fade-in">
+            <div className="bg-dark-card rounded-t-3xl w-full max-h-[85vh] overflow-hidden border-t border-dark-border animate-slide-up">
+                {/* Header */}
+                <div className="sticky top-0 bg-dark-card p-4 border-b border-dark-border">
+                    <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-amber-500/20 rounded-full flex items-center justify-center">
+                                <RefreshCw className="w-4 h-4 text-amber-400" />
+                            </div>
+                            <span className="text-sm font-medium text-amber-400">Substitution Genius</span>
+                        </div>
+                        <button
+                            onClick={onClose}
+                            className="w-8 h-8 bg-dark-elevated rounded-full flex items-center justify-center"
+                        >
+                            <X className="w-4 h-4 text-gray-400" />
+                        </button>
+                    </div>
+                    <h3 className="text-lg font-semibold text-white">
+                        Don&apos;t have <span className="text-amber-400">{ingredient}</span>?
+                    </h3>
+                    <p className="text-gray-500 text-sm">Here are some alternatives you can use:</p>
+                </div>
+
+                {/* Content */}
+                <div className="p-4 overflow-y-auto max-h-[60vh]">
+                    {loading && (
+                        <div className="flex flex-col items-center justify-center py-12">
+                            <Loader2 className="w-8 h-8 text-amber-400 animate-spin mb-3" />
+                            <p className="text-gray-400 text-sm">Finding substitutes...</p>
+                        </div>
+                    )}
+
+                    {error && (
+                        <div className="text-center py-8">
+                            <X className="w-10 h-10 text-red-400 mx-auto mb-3" />
+                            <p className="text-red-400 mb-4">{error}</p>
+                            <button
+                                onClick={onClose}
+                                className="px-6 py-2 bg-dark-elevated rounded-lg text-white"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    )}
+
+                    {result && !loading && (
+                        <>
+                            {result.noSubstituteReason ? (
+                                <div className="text-center py-8">
+                                    <div className="w-12 h-12 bg-gray-500/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <X className="w-6 h-6 text-gray-400" />
+                                    </div>
+                                    <p className="text-gray-400 mb-2">No substitutes available</p>
+                                    <p className="text-gray-500 text-sm">{result.noSubstituteReason}</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {result.substitutes.map((sub, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => onSelect(sub)}
+                                            className="w-full p-4 bg-dark-elevated border border-dark-border rounded-xl text-left hover:bg-dark-card transition-colors active:scale-[0.98]"
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center border ${getTypeColor(sub.type)}`}>
+                                                    {getTypeIcon(sub.type)}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 mb-1">
+                                                        <span className="font-medium text-white">{sub.name}</span>
+                                                        <span className={`px-2 py-0.5 text-xs rounded-full capitalize ${getTypeColor(sub.type)}`}>
+                                                            {sub.type}
+                                                        </span>
+                                                    </div>
+                                                    <p className="text-amber-400 text-sm font-medium mb-1">{sub.ratio}</p>
+                                                    <p className="text-gray-500 text-sm">{sub.notes}</p>
+                                                </div>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="sticky bottom-0 bg-dark-card p-4 border-t border-dark-border">
+                    <button
+                        onClick={onClose}
+                        className="w-full py-3 bg-dark-elevated border border-dark-border rounded-xl text-white font-medium"
+                    >
+                        Continue with original
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 
 // Completion Modal with Share Feature
 function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () => void }) {
@@ -395,6 +568,31 @@ function PreCookOverview({
     recipe: Recipe;
     onStart: () => void;
 }) {
+    const [substitutionIngredient, setSubstitutionIngredient] = useState<string | null>(null);
+    const [substitutions, setSubstitutions] = useState<Record<string, string>>({});
+
+    const handleSelectSubstitute = (sub: IngredientSubstitute) => {
+        if (substitutionIngredient) {
+            setSubstitutions(prev => ({
+                ...prev,
+                [substitutionIngredient]: `${sub.name} (${sub.ratio})`
+            }));
+        }
+        setSubstitutionIngredient(null);
+    };
+
+    const getDisplayIngredient = (ing: string) => {
+        if (substitutions[ing]) {
+            return (
+                <span className="flex flex-col">
+                    <span className="line-through text-gray-500">{ing}</span>
+                    <span className="text-amber-400 text-xs mt-0.5">→ {substitutions[ing]}</span>
+                </span>
+            );
+        }
+        return ing;
+    };
+
     return (
         <div className="min-h-screen bg-black px-5 pt-12 pb-24 animate-fade-in">
             <h1 className="text-2xl font-bold text-white mb-2">{recipe.title}</h1>
@@ -414,13 +612,29 @@ function PreCookOverview({
 
             {/* Ingredients */}
             <section className="mb-6">
-                <h2 className="text-sm font-medium text-gray-400 mb-3">Ingredients</h2>
+                <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-sm font-medium text-gray-400">Ingredients</h2>
+                    <span className="text-xs text-amber-400/70 flex items-center gap-1">
+                        <RefreshCw className="w-3 h-3" />
+                        Tap to substitute
+                    </span>
+                </div>
                 <div className="bg-dark-card border border-dark-border rounded-xl p-4">
                     <ul className="space-y-2">
                         {recipe.ingredients.provided.map((ing, idx) => (
-                            <li key={idx} className="text-white text-sm flex items-start gap-2">
-                                <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
-                                {ing}
+                            <li key={idx} className="text-white text-sm flex items-center justify-between gap-2">
+                                <div className="flex items-start gap-2 flex-1">
+                                    <Check className="w-4 h-4 text-green-400 mt-0.5 flex-shrink-0" />
+                                    {getDisplayIngredient(ing)}
+                                </div>
+                                {!substitutions[ing] && (
+                                    <button
+                                        onClick={() => setSubstitutionIngredient(ing)}
+                                        className="flex-shrink-0 px-2 py-1 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg hover:bg-amber-500/20 transition-colors"
+                                    >
+                                        Swap
+                                    </button>
+                                )}
                             </li>
                         ))}
                     </ul>
@@ -433,9 +647,19 @@ function PreCookOverview({
                             </h3>
                             <ul className="space-y-2">
                                 {recipe.ingredients.shoppingList.map((ing, idx) => (
-                                    <li key={idx} className="text-gray-400 text-sm flex items-start gap-2">
-                                        <X className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
-                                        {ing}
+                                    <li key={idx} className="text-gray-400 text-sm flex items-center justify-between gap-2">
+                                        <div className="flex items-start gap-2 flex-1">
+                                            <X className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                                            {getDisplayIngredient(ing)}
+                                        </div>
+                                        {!substitutions[ing] && (
+                                            <button
+                                                onClick={() => setSubstitutionIngredient(ing)}
+                                                className="flex-shrink-0 px-2 py-1 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg hover:bg-amber-500/20 transition-colors"
+                                            >
+                                                Swap
+                                            </button>
+                                        )}
                                     </li>
                                 ))}
                             </ul>
@@ -468,9 +692,20 @@ function PreCookOverview({
                 <Play className="w-5 h-5" />
                 Start Cooking
             </button>
+
+            {/* Substitution Modal */}
+            {substitutionIngredient && (
+                <SubstitutionModal
+                    ingredient={substitutionIngredient}
+                    recipeName={recipe.title}
+                    onClose={() => setSubstitutionIngredient(null)}
+                    onSelect={handleSelectSubstitute}
+                />
+            )}
         </div>
     );
 }
+
 
 function CookContent() {
     const router = useRouter();

@@ -669,3 +669,89 @@ export async function getCookingTip(
     }, 'getCookingTip');
 }
 
+/**
+ * Substitution Genius: Get substitute suggestions for a missing ingredient
+ */
+export interface IngredientSubstitute {
+    name: string;
+    ratio: string;           // e.g., "1:1", "2 tbsp for 1 tbsp"
+    notes: string;           // Brief explanation
+    type: 'common' | 'dietary' | 'creative';
+}
+
+export interface SubstitutionResult {
+    original: string;
+    substitutes: IngredientSubstitute[];
+    noSubstituteReason?: string;
+}
+
+export async function getIngredientSubstitutes(
+    ingredient: string,
+    context: {
+        recipeName?: string;
+        dietaryRestrictions?: string[];
+        allergies?: string[];
+        otherIngredients?: string[];
+    } = {}
+): Promise<SubstitutionResult> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: {
+                responseMimeType: "application/json",
+                temperature: 0.7
+            }
+        });
+
+        const { recipeName, dietaryRestrictions = [], allergies = [], otherIngredients = [] } = context;
+
+        const prompt = `
+        You are a culinary expert helping home cooks find ingredient substitutes.
+        
+        The user is cooking ${recipeName ? `"${recipeName}"` : 'a recipe'} and doesn't have:
+        **${ingredient}**
+        
+        ${otherIngredients.length > 0 ? `Other ingredients they have: ${otherIngredients.join(', ')}` : ''}
+        ${dietaryRestrictions.length > 0 ? `Dietary restrictions: ${dietaryRestrictions.join(', ')}` : ''}
+        ${allergies.length > 0 ? `ALLERGIES (CRITICAL - never suggest these): ${allergies.join(', ')}` : ''}
+        
+        Provide 3-5 substitute options. For each substitute:
+        1. name: The substitute ingredient
+        2. ratio: Exact conversion (e.g., "1:1 replacement" or "2 tbsp yogurt for 1 tbsp cream")
+        3. notes: Brief tip on how it changes the dish (max 15 words)
+        4. type: 
+           - "common" = easily found at home
+           - "dietary" = healthier or addresses dietary needs
+           - "creative" = unexpected but works well
+        
+        Order by practicality (most likely to have at home first).
+        If no good substitutes exist, explain why in noSubstituteReason.
+        
+        Return JSON:
+        {
+            "original": "${ingredient}",
+            "substitutes": [
+                {
+                    "name": "substitute name",
+                    "ratio": "conversion ratio",
+                    "notes": "brief usage tip",
+                    "type": "common" | "dietary" | "creative"
+                }
+            ],
+            "noSubstituteReason": "optional - only if truly no substitutes exist"
+        }
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            return JSON.parse(text) as SubstitutionResult;
+        } catch (e) {
+            console.error("Failed to parse substitution JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'getIngredientSubstitutes');
+}
+
