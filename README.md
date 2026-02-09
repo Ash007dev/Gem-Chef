@@ -1,152 +1,149 @@
-# 🍳 Gem-Chef (SmartChef)
+# Gem-Chef: AI-Powered Smart Kitchen Assistant
 
-**AI-Powered Cooking Assistant** with real-time Gemini Live guidance, smart recipe generation, and step-by-step voice-guided cooking.
+## Introduction
+Gem-Chef is an advanced, AI-driven kitchen management and cooking assistant designed to reduce food waste, simplify meal planning, and elevate the home cooking experience. By leveraging the cutting-edge **Google Gemini 3 Preview** models (Pro & Flash), Gem-Chef transforms how users interact with their kitchen—from scanning grocery bills to generating step-by-step cooking guides with real-time visual feedback.
 
-![Next.js](https://img.shields.io/badge/Next.js-14-black)
-![Gemini](https://img.shields.io/badge/Google%20Gemini-2.5-blue)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
+## Problem Statement
+Modern home cooking faces several challenges:
+*   **Food Waste**: Ingredients often expire before use due to poor inventory tracking.
+*   **Decision Fatigue**: "What should I cook?" is a daily dilemma, often leading to unhealthy takeout choices.
+*   **Skill Gaps**: Beginners struggle with complex recipes and lack real-time guidance.
+*   **Disorganized Planning**: Managing grocery lists, nutrition goals, and meal schedules is often fragmented across multiple apps or mental notes.
 
-## ✨ Features
+## Solution
+Gem-Chef solves these problems by integrating AI into every stage of the cooking process:
+*   **Smart Inventory**: Automatically tracks ingredients and expiry dates via bill scanning.
+*   **Intelligent Recipe Generation**: Creates custom recipes based on what you have, reducing waste.
+*   **Real-time Assistance**: Provides voice-guided cooking instructions and visual verification of cooking steps.
+*   **Holistic Management**: Combines meal planning, nutrition tracking, and shopping lists in one platform.
 
-- 🔍 **Smart Food Scanner** — Snap ingredients → AI identifies them
-- 🍲 **Recipe Generation** — 9 personalized recipes (3 regional + 6 styled)
-- 📖 **Detailed Steps** — Beginner-friendly with timing & visual cues
-- 🎙️ **Voice-Guided Cooking** — Hands-free step-by-step instructions
-- 📷 **Step Verification** — Take photos to verify cooking progress
-- 🎥 **Gemini Live Mode** — Real-time AI assistant with camera + mic
-- 📚 **Cook Log** — History of cooked recipes
+## Key Features
 
----
+### 1. Smart Inventory Management
+*   **Bill Scanning**: Users can upload grocery bills, and Gem-Chef uses OCR (Optical Character Recognition) via Gemini Vision to automatically populate the inventory with items and quantities.
+*   **Expiry Tracking**: AI suggests expiry dates for items, alerting users before food goes bad.
+*   **Manual Entry**: Users can also add items manually with categorization (Produce, Dairy, Spices, etc.).
+*   **Low Stock Alerts**: Notifies users when essentials are running low.
 
-## 🚀 Quick Start
+### 2. AI Recipe Generation
+*   **Ingredient-Based Recipes**: Generates recipes using only the ingredients currently available in the user's inventory.
+*   **"Describe a Dish"**: Users can describe a craving (e.g., "spicy pasta with creamy sauce"), and the AI generates a specific recipe to match.
+*   **Dietary Customization**: Tailors recipes for specific diets (Vegetarian, Vegan, Keto, etc.), allergies, and health conditions (Diabetes, Hypertension).
+*   **Gourmet Mode**: Transforms basic ingredients into chef-quality meals with creative twists.
 
-### Prerequisites
+### 3. Interactive Cooking Mode
+*   **Step-by-Step Guidance**: The application reads out instructions step-by-step, allowing for hands-free cooking.
+*   **Visual Verification**: Users can snap a photo of their cooking at any step. Gemini Vision analyzes the image to verify if the step was completed correctly (e.g., "Onions are golden brown") and provides real-time feedback.
+*   **Timers**: Built-in timers for specific steps (e.g., "Simmer for 10 minutes").
 
-- **Node.js** 18+ ([Download](https://nodejs.org/))
-- **npm** or **yarn**
-- **Google Gemini API Key** ([Get one free](https://aistudio.google.com/app/apikey))
+### 4. Meal Planner & Shopping List
+*   **Smart Planning**: Generates 3-day or weekly meal plans based on user preferences and inventory.
+*   **Automated Grocery Lists**: Creates a consolidated shopping list for missing ingredients required for the planned meals.
+*   **WhatsApp Integration**: Users can share their meal plans and grocery lists via WhatsApp.
 
-### 1. Clone the Repository
+### 5. Nutrition Tracker
+*   **Macro Tracking**: Automatically calculates calories, protein, carbs, and fats for every recipe cooked.
+*   **Daily Logs**: Tracks daily intake against user-set goals.
+*   **Progress Visualization**: Displays weekly consumption trends and adherence to diet plans.
 
-```bash
-git clone https://github.com/Ash007dev/Gem-Chef.git
-cd Gem-Chef
-```
+### 6. Worldwide Cuisine Explorer
+*   **Global Dishes**: Allows users to explore recipes from specific countries.
+*   **Cultural Context**: Provides information on traditional, seasonal, and trending dishes from the selected region.
+*   **Recipe Generation**: Instantly generates recipes for any discovered international dish.
 
-### 2. Install Dependencies
+### 7. "My Recipes" & Cooklog
+*   **Recipe Book**: Users can save their favorite generated recipes.
+*   **Editing**: Saved recipes can be customized and updated.
+*   **Cooklog**: A history of all cooked meals with dates and times.
 
-```bash
-npm install
-```
+## Powered by Google Gemini 3
+Gem-Chef is built on the foundation of Google's latest **Gemini 3 Preview** models, utilizing their multimodal capabilities to deliver features that standard text-based AI cannot achieve.
 
-### 3. Set Up Environment Variables
+### Why Gemini 3?
+*   **Multimodal Reasoning (Text + Vision)**:
+    *   **Ingredient Recognition**: Instead of typing, users can snap a photo of their pantry or fridge. Gemini Vision identifies ingredients instantly (`gemini-pro-vision`).
+    *   **Cooking Step Verification**: During cooking mode, the AI analyzes real-time photos of the pan to determine if the food is cooked correctly (e.g., identifying "soft peaks" in egg whites or "caramelization" on onions), acting as a virtual sous-chef.
+    *   **Bill Scanning**: High-accuracy OCR extracts structured data (item names, quantities, prices) from complex receipts images.
 
-Create a `.env.local` file in the root directory:
+*   **Advanced Context Window & Reasoning**:
+    *   **Complex Dietary Handling**: The model processes intricate combinations of user constraints (e.g., "Vegetarian, Diabetic, High Protein, avoid Mushrooms") simultaneously to generate safe, delicious recipes.
+    *   **Creative "Gourmet" Logic**: The AI understands culinary theory, allowing it to suggest creative substitutions and gourmet transformations for basic ingredients.
 
-```bash
-# Copy the example file
-cp .env.example .env.local
-```
+*   **Performance & Latency**:
+    *   **Real-Time Interaction**: By leveraging `gemini-3-flash-preview`, the application provides near-instant responses for search and chat interactions, critical for a smooth user experience in the kitchen.
 
-Then edit `.env.local` and add your API key:
-
-```env
-GEMINI_API_KEY=your_gemini_api_key_here
-```
-
-> ⚠️ **IMPORTANT:** Never commit your `.env.local` file. It's already in `.gitignore`.
-
-### 4. Run the Development Server
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
----
-
-## 📂 Project Structure
+## Repository Structure
 
 ```
 Gem-Chef/
-├── app/                    # Next.js pages
-│   ├── page.tsx           # Home (ingredient scanner)
-│   ├── recipes/page.tsx   # Recipe results
-│   ├── cook/page.tsx      # Cooking mode + Live Mode
-│   ├── cooklog/page.tsx   # Cooking history
-│   └── api/               # API routes
-│       └── gemini-token/  # Token provider for Live API
-├── components/            # React components
-│   └── LiveCookingOverlay.tsx  # Gemini Live UI
+├── app/
+│   ├── analytics/       # User cooking stats and progress visualization
+│   ├── cook/            # Interactive voice-guided cooking & visual verification
+│   ├── cook-along/      # Video recipe integration for learning
+│   ├── cooklog/         # History of cooked meals
+│   ├── describe/        # "Describe a Dish" prompt interface
+│   ├── gourmet/         # Advanced recipe transformation logic
+│   ├── inventory/       # Pantry management & bill scanning (OCR)
+│   ├── meal-planner/    # AI-driven weekly meal planning & grocery lists
+│   ├── my-recipes/      # User's saved recipe collection & editing
+│   ├── nutrition/       # Macro tracking & dietary logs
+│   ├── scan/            # Ingredient recognition via camera
+│   ├── worldwide/       # Global cuisine explorer & cultural dishes
+│   ├── globals.css      # Tailwind global styles
+│   ├── layout.tsx       # Root layout & providers
+│   └── page.tsx         # Landing page
 ├── utils/
-│   ├── gemini.ts          # Gemini text/vision API
-│   └── gemini-live.ts     # Gemini Live API (WebSocket)
-├── public/                # Static assets
-└── styles/               # CSS
+│   ├── gemini.ts        # Core AI logic (Model configuration, Vision, Prompt Engineering)
+│   ├── inventory.ts     # Inventory data management utilities
+│   ├── nutrition-storage.ts # LocalStorage wrappers for nutrition data
+│   ├── reminders.ts     # Expiry notification logic
+│   ├── voice.ts         # Text-to-Speech (TTS) configuration
+│   └── ...
+├── public/              # Static assets (images, icons)
+├── package.json         # Dependencies & scripts
+└── README.md            # Project documentation
 ```
 
----
+## Tech Stack
 
-## 🎥 Gemini Live Mode
+*   **Frontend Framework**: Next.js 14 (App Router)
+*   **Language**: TypeScript
+*   **Styling**: React, Tailwind CSS
+*   **AI Models**: Google Gemini 3 Pro Preview & Gemini 3 Flash Preview (Text & Vision)
+*   **Icons**: Lucide React
+*   **State Management**: React Hooks (useState, useEffect, useReducer)
+*   **Persistence**: LocalStorage & SessionStorage (Client-side only for privacy)
 
-The real-time cooking assistant uses:
-- **Camera** — Shows AI what you're cooking
-- **Microphone** — Voice conversations
-- **Speaker** — AI speaks back with tips
+## Installation & Setup
 
-### Requirements for Live Mode
-- Modern browser with WebRTC support (Chrome, Edge, Firefox)
-- Camera and microphone permissions
-- Stable internet connection
+Follow these steps to run Gem-Chef locally:
 
----
+1.  **Clone the Repository**
+    ```bash
+    git clone <repository-url>
+    cd Gem-Chef
+    ```
 
-## 🔧 Available Scripts
+2.  **Install Dependencies**
+    ```bash
+    npm install
+    ```
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start development server |
-| `npm run build` | Build for production |
-| `npm run start` | Start production server |
-| `npm run lint` | Run ESLint |
+3.  **Environment Setup**
+    Create a `.env.local` file in the root directory and add your Google Gemini API key:
+    ```bash
+    GEMINI_API_KEY=your_api_key_here
+    # Optional: Add multiple keys for rotation
+    # GEMINI_API_KEYS=key1,key2,key3
+    ```
 
----
+4.  **Run the Development Server**
+    ```bash
+    npm run dev
+    ```
 
-## 🛠️ Troubleshooting
+5.  **Open the Application**
+    Open your browser and navigate to `http://localhost:3000` to start using Gem-Chef.
 
-### "GEMINI_API_KEY is not defined"
-- Make sure you created `.env.local` with your API key
-- Restart the dev server after adding the key
-
-### "Gemini Live disconnects immediately"
-- Check browser console for specific error
-- Ensure camera/mic permissions are granted
-- Try a different browser (Chrome recommended)
-
-### "Module not found" errors
-- Run `npm install` again
-- Delete `node_modules` and `package-lock.json`, then reinstall
-
----
-
-## 👥 Team
-
-| Name | Role |
-|------|------|
-| Ashish | Lead Developer |
-| [Add teammates here] | ... |
-
----
-
-## 📝 License
-
-This project is for educational purposes.
-
----
-
-## 🙏 Acknowledgments
-
-- [Google Gemini API](https://ai.google.dev/)
-- [Next.js](https://nextjs.org/)
-- [Lucide Icons](https://lucide.dev/)
+## License
+This project is for educational and portfolio purposes. All AI-generated content should be verified for safety before use.
