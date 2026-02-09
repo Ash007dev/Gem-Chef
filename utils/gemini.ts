@@ -216,6 +216,15 @@ export interface Recipe {
     };
     steps: string[];
     mealPrep: string[];
+    nutrition: {
+        calories: number;
+        protein: number;
+        carbs: number;
+        fat: number;
+        fiber?: number;
+        sodium?: number;
+        sugar?: number;
+    };
     // Smart Prep Reminders
     prepRequirements?: {
         type: 'marination' | 'soaking' | 'defrosting' | 'resting' | 'chilling' | 'other';
@@ -503,6 +512,13 @@ export async function generateRecipes(
         3. INGREDIENTS should have EXACT quantities with alternatives:
            - "2 medium onions (about 200g), finely diced"
            - "1 cup rice (200g) - Basmati or any long-grain rice works"
+
+        4. NUTRITION CALCULATION - For each recipe, calculate detailed nutrition PER SERVING:
+            - Use standard nutrition databases (USDA, etc.) for ingredient values
+            - Calculate based on exact ingredient quantities
+            - Account for cooking methods (oil absorption, water loss, etc.)
+            - Round to whole numbers for readability
+            - Include: calories, protein (g), carbs (g), fat (g), fiber (g), sodium (mg), sugar (g)
 
         4. PREP REQUIREMENTS (IMPORTANT for Smart Reminders):
            - If a recipe requires ADVANCE preparation (marinating, soaking, defrosting, resting dough, chilling), you MUST include it in prepRequirements
@@ -1012,4 +1028,269 @@ Rules:
             throw new Error(`Invalid JSON response from ${modelName}`);
         }
     }, 'parseRecipeText');
+}
+// ============================================================================
+// WORLDWIDE DISHES - Generate country-specific dish recommendations
+// ============================================================================
+
+import type { CountryDish, Difficulty } from './worldwide-types';
+
+export async function getCountryDishes(
+    country: string,
+    countryCode: string,
+    options: {
+        includeTraditional?: boolean;
+        includeSeasonal?: boolean;
+        includeTrending?: boolean;
+        includePopular?: boolean;
+        difficulty?: Difficulty;
+        currentMonth?: number;
+    } = {}
+): Promise<CountryDish[]> {
+    const {
+        includeTraditional = true,
+        includeSeasonal = true,
+        includeTrending = true,
+        includePopular = true,
+        difficulty,
+        currentMonth = new Date().getMonth() + 1 // 1-12
+    } = options;
+
+    // Month names for seasonal context
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'];
+    const currentMonthName = monthNames[currentMonth - 1];
+
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: {
+                temperature: 0.9,
+                maxOutputTokens: 4000,
+            },
+        });
+
+        const prompt = `You are a world cuisine expert creating a curated list of dishes from ${country}.
+
+GENERATE 6-8 DIVERSE DISHES from ${country} cuisine:
+
+${includeTraditional ? `
+- 2 TRADITIONAL/AUTHENTIC dishes (category: "traditional")
+  Classic, iconic dishes that define ${country} cuisine
+  Must be historically significant and culturally important
+` : ''}
+
+${includeSeasonal ? `
+- 2 SEASONAL dishes (category: "seasonal") 
+  Perfect for ${currentMonthName} (current month)
+  Consider seasonal ingredients, weather, holidays, festivals
+  Add a seasonalNote explaining why it's perfect for ${currentMonthName}
+` : ''}
+
+${includeTrending ? `
+- 2 TRENDING/MODERN dishes (category: "trending")
+  Contemporary takes on ${country} cuisine
+  Fusion, modern plating, or viral social media dishes
+  Popular in restaurants and food blogs right now
+` : ''}
+
+${includePopular ? `
+- 1-2 POPULAR EVERYDAY dishes (category: "popular")
+  What locals actually cook at home regularly
+  Comfort food, street food, family favorites
+` : ''}
+
+${difficulty ? `DIFFICULTY CONSTRAINT: All dishes must be "${difficulty}" difficulty level.` : 'Mix of Easy, Medium, and Hard difficulty levels.'}
+
+REQUIREMENTS:
+1. Each dish must be AUTHENTIC to ${country} - no generic dishes
+2. Include EXACT dish names in the local language (with English translation if needed)
+3. Brief but enticing description (2-3 sentences max)
+4. Realistic prep and cook times
+5. Add relevant tags (e.g., "spicy", "vegetarian", "street-food", "festive")
+6. For seasonal dishes, explain the seasonal connection
+
+Return a JSON array with this EXACT schema:
+[
+  {
+    "id": "unique-dish-id",
+    "title": "Dish Name (Local Name)",
+    "country": "${country}",
+    "countryCode": "${countryCode}",
+    "category": "traditional" | "seasonal" | "trending" | "popular",
+    "description": "Brief enticing description",
+    "difficulty": "Easy" | "Medium" | "Hard",
+    "prepTime": "15 min",
+    "cookTime": "30 min",
+    "tags": ["tag1", "tag2", "tag3"],
+    "seasonalNote": "Why perfect for ${currentMonthName}" // ONLY for seasonal dishes
+  }
+]
+
+CRITICAL: Return ONLY the JSON array, no markdown, no explanations, no code blocks.`;
+
+        const result = await model.generateContent(prompt);
+        const response = result.response;
+        let text = response.text().trim();
+
+        // Clean markdown code blocks if present
+        if (text.startsWith('```')) {
+            text = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        }
+
+        try {
+            const dishes = JSON.parse(text) as CountryDish[];
+
+            // Validate and ensure all required fields
+            return dishes.map((dish, index) => ({
+                id: dish.id || `${countryCode.toLowerCase()}-${index}-${Date.now()}`,
+                title: dish.title,
+                country: country,
+                countryCode: countryCode,
+                category: dish.category,
+                description: dish.description,
+                difficulty: dish.difficulty,
+                prepTime: dish.prepTime,
+                cookTime: dish.cookTime,
+                tags: dish.tags || [],
+                seasonalNote: dish.seasonalNote
+            }));
+        } catch (e) {
+            console.error("Failed to parse country dishes JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, `getCountryDishes(${country})`);
+}
+
+/**
+ * Extract recipe from video transcript
+ * Analyzes transcript and structures it into a recipe with timestamped steps
+ */
+export async function extractRecipeFromVideo(
+    transcript: string,
+    videoMetadata: {
+        title: string;
+        duration: number;
+        thumbnail: string;
+    }
+): Promise<{
+    ingredients: string[];
+    steps: Array<{
+        stepNumber: number;
+        instruction: string;
+        timestamp: number;
+        duration?: number;
+        ingredients?: string[];
+        hasTimer?: boolean;
+        timerDuration?: number;
+        timerLabel?: string;
+    }>;
+}> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: {
+                responseMimeType: "application/json",
+                temperature: 0.7
+            }
+        });
+
+        const prompt = `You are an expert at analyzing cooking video transcripts and extracting structured recipes.
+
+Video Title: "${videoMetadata.title}"
+Video Duration: ${Math.floor(videoMetadata.duration / 60)} minutes ${videoMetadata.duration % 60} seconds
+
+Transcript:
+${transcript}
+
+Your task:
+1. Extract the COMPLETE ingredient list mentioned in the video
+2. Break down the cooking process into clear, sequential steps
+3. For each step, identify the approximate timestamp (in seconds) when it's mentioned
+4. Identify which ingredients are used in each step
+5. Detect any timers mentioned (e.g., "cook for 5 minutes", "let it rest for 10 minutes")
+
+Important guidelines:
+- Steps should be actionable and clear (e.g., "Heat oil in a pan" not "So we're gonna heat the oil")
+- Timestamps should be when the step is FIRST mentioned or demonstrated
+- Include prep steps (chopping, mixing) and cooking steps
+- If a timer is mentioned, extract the duration in seconds and a label
+- Group related actions into single steps (don't make it too granular)
+- Aim for 6-15 steps for most recipes
+
+Return a JSON object with this EXACT structure:
+{
+  "ingredients": ["ingredient 1", "ingredient 2", ...],
+  "steps": [
+    {
+      "stepNumber": 1,
+      "instruction": "Clear instruction for this step",
+      "timestamp": 45,
+      "duration": 30,
+      "ingredients": ["ingredient used in this step"],
+      "hasTimer": false
+    },
+    {
+      "stepNumber": 2,
+      "instruction": "Another step with timer",
+      "timestamp": 120,
+      "duration": 60,
+      "ingredients": ["ingredient 1", "ingredient 2"],
+      "hasTimer": true,
+      "timerDuration": 300,
+      "timerLabel": "Simmer"
+    }
+  ]
+}
+
+CRITICAL: Return ONLY valid JSON, no markdown formatting, no explanations.`;
+
+        const result = await model.generateContent(prompt);
+        const text = result.response.text().trim();
+
+        // Clean up response
+        let cleanedText = text;
+        if (text.startsWith('```json')) {
+            cleanedText = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+        } else if (text.startsWith('```')) {
+            cleanedText = text.replace(/```\n?/g, '').trim();
+        }
+
+        try {
+            const parsed = JSON.parse(cleanedText);
+
+            // Validate structure
+            if (!parsed.ingredients || !Array.isArray(parsed.ingredients)) {
+                throw new Error('Invalid ingredients format');
+            }
+            if (!parsed.steps || !Array.isArray(parsed.steps)) {
+                throw new Error('Invalid steps format');
+            }
+
+            // Ensure all steps have required fields
+            parsed.steps = parsed.steps.map((step: any, index: number) => ({
+                stepNumber: step.stepNumber || index + 1,
+                instruction: step.instruction || '',
+                timestamp: step.timestamp || 0,
+                duration: step.duration,
+                ingredients: step.ingredients || [],
+                hasTimer: step.hasTimer || false,
+                timerDuration: step.timerDuration,
+                timerLabel: step.timerLabel
+            }));
+
+            // Sort steps by timestamp
+            parsed.steps.sort((a: any, b: any) => a.timestamp - b.timestamp);
+
+            // Renumber steps after sorting
+            parsed.steps.forEach((step: any, index: number) => {
+                step.stepNumber = index + 1;
+            });
+
+            return parsed;
+        } catch (e) {
+            console.error("Failed to parse video recipe JSON:", cleanedText);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, `extractRecipeFromVideo(${videoMetadata.title})`);
 }

@@ -260,6 +260,8 @@ function SubstitutionModal({
 
 // Completion Modal with Share Feature
 function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () => void }) {
+    const [servingsConsumed, setServingsConsumed] = useState(1);
+
     const [showShare, setShowShare] = useState(false);
     const [dishPhoto, setDishPhoto] = useState<string | null>(null);
     const [isGeneratingCard, setIsGeneratingCard] = useState(false);
@@ -267,7 +269,7 @@ function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () =>
     const fileInputRef = useRef<HTMLInputElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    // Save to cooklog (prevent duplicates - only add once per recipe per session)
+    // Save to cooklog and log nutrition (prevent duplicates - only add once per recipe per session)
     useEffect(() => {
         const savedLog = localStorage.getItem('cooklog');
         const cooklog = savedLog ? JSON.parse(savedLog) : [];
@@ -285,7 +287,32 @@ function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () =>
             });
             localStorage.setItem('cooklog', JSON.stringify(cooklog.slice(0, 50)));
         }
-    }, [recipe]);
+
+        // Log nutrition
+        if (recipe.nutrition) {
+            const { logNutrition, generateLogId, getTodayDate } = require('@/utils/nutrition-storage');
+            const totalNutrition = {
+                calories: recipe.nutrition.calories * servingsConsumed,
+                protein: recipe.nutrition.protein * servingsConsumed,
+                carbs: recipe.nutrition.carbs * servingsConsumed,
+                fat: recipe.nutrition.fat * servingsConsumed,
+                fiber: (recipe.nutrition.fiber || 0) * servingsConsumed,
+                sodium: (recipe.nutrition.sodium || 0) * servingsConsumed,
+                sugar: (recipe.nutrition.sugar || 0) * servingsConsumed
+            };
+
+            logNutrition({
+                id: generateLogId(),
+                date: getTodayDate(),
+                recipeId: recipe.id,
+                recipeTitle: recipe.title,
+                mealType: getMealTypeFromTime(),
+                servings: servingsConsumed,
+                nutrition: totalNutrition,
+                timestamp: new Date().toISOString()
+            });
+        }
+    }, [recipe, servingsConsumed]);
 
     const handlePhotoSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -530,6 +557,15 @@ function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () =>
         );
     }
 
+    const getMealTypeFromTime = () => {
+        const hour = new Date().getHours();
+        if (hour < 10) return 'Breakfast';
+        if (hour < 12) return 'Brunch';
+        if (hour < 15) return 'Lunch';
+        if (hour < 18) return 'Snack';
+        return 'Dinner';
+    };
+
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 animate-fade-in">
             <div className="bg-dark-card rounded-2xl p-8 w-full max-w-sm border border-dark-border animate-scale-in text-center">
@@ -540,8 +576,52 @@ function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () =>
                     Well Done!
                 </h2>
                 <p className="text-gray-400 mb-6 text-sm">
-                    You've completed {recipe.title}. Added to your cooklog.
+                    You've completed {recipe.title}
                 </p>
+
+                {/* Nutrition Summary */}
+                {recipe.nutrition && (
+                    <div className="bg-dark-elevated border border-dark-border rounded-xl p-4 mb-6">
+                        <h3 className="text-xs font-medium text-gray-400 mb-3">Nutrition Logged</h3>
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div>
+                                <div className="text-2xl font-bold text-white">
+                                    {Math.round(recipe.nutrition.calories * servingsConsumed)}
+                                </div>
+                                <div className="text-xs text-gray-500">Calories</div>
+                            </div>
+                            <div>
+                                <div className="text-lg font-bold text-white">
+                                    {Math.round(recipe.nutrition.protein * servingsConsumed)}g
+                                </div>
+                                <div className="text-xs text-gray-500">Protein</div>
+                            </div>
+                        </div>
+
+                        {/* Servings Adjuster */}
+                        <div className="mt-4 pt-4 border-t border-dark-border">
+                            <label className="text-xs text-gray-400 block mb-2">Servings consumed</label>
+                            <div className="flex items-center justify-center gap-3">
+                                <button
+                                    onClick={() => setServingsConsumed(Math.max(0.5, servingsConsumed - 0.5))}
+                                    className="w-8 h-8 bg-dark-card border border-dark-border rounded-lg text-white"
+                                >
+                                    -
+                                </button>
+                                <span className="text-lg font-medium text-white w-12 text-center">
+                                    {servingsConsumed}
+                                </span>
+                                <button
+                                    onClick={() => setServingsConsumed(servingsConsumed + 0.5)}
+                                    className="w-8 h-8 bg-dark-card border border-dark-border rounded-lg text-white"
+                                >
+                                    +
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <button
                     onClick={() => setShowShare(true)}
                     className="w-full py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl font-semibold mb-3 flex items-center justify-center gap-2"
@@ -784,7 +864,7 @@ function CookContent() {
                 try {
                     const parsed = JSON.parse(plateRecipe);
                     // Convert plate-to-recipe format to cook page format
-                    const cookRecipe = {
+                    const cookRecipe: any = {
                         id: `plate-${Date.now()}`,
                         title: parsed.title,
                         description: parsed.description,
@@ -799,7 +879,9 @@ function CookContent() {
                             ? parsed.ingredients
                             : { provided: parsed.ingredients || [], shoppingList: [] },
                         steps: parsed.steps || [],
-                        mealPrep: parsed.tips || parsed.mealPrep || []
+                        mealPrep: parsed.tips || parsed.mealPrep || [],
+                        // Add nutrition field if available
+                        nutrition: parsed.nutrition || undefined
                     };
                     setRecipe(cookRecipe);
                     // Clear the localStorage after loading

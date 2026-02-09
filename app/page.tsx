@@ -21,6 +21,7 @@ import {
     CookingPot,
     Calendar,
     NotebookPen,
+    Globe,
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -214,6 +215,16 @@ export default function LandingPage() {
                         <ImageIcon className="w-5 h-5 text-orange-400 mb-3" />
                         <h4 className="text-white text-sm font-medium mb-0.5">Plate to Recipe</h4>
                         <p className="text-gray-500 text-xs">Photo to full recipe</p>
+                    </button>
+
+                    {/* Worldwide */}
+                    <button
+                        onClick={() => router.push('/worldwide')}
+                        className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/20 rounded-xl p-4 text-left hover:border-purple-500/40 active:scale-[0.97] transition-all"
+                    >
+                        <Globe className="w-5 h-5 text-purple-400 mb-3" />
+                        <h4 className="text-white text-sm font-medium mb-0.5">Worldwide</h4>
+                        <p className="text-gray-500 text-xs">Explore global cuisines</p>
                     </button>
 
                     {/* My Recipes */}
