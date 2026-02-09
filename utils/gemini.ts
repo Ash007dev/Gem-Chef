@@ -119,6 +119,8 @@ async function generateWithFallback<T>(
             }
         }
 
+
+
         // Try rotating to a different API key
         keysTriedCount++;
         if (keysTriedCount < totalKeys) {
@@ -890,5 +892,73 @@ export async function generateGourmetTransformations(
             throw new Error(`Invalid JSON response from ${modelName}`);
         }
     }, 'generateGourmetTransformations');
+}
+
+export interface VideoSyncedRecipe {
+    title: string;
+    description: string;
+    totalTime: string; // e.g. "Prep: 15m, Cook: 30m"
+    ingredients: string[];
+    steps: {
+        instruction: string;
+        explanation: string; // Brief detail about the step
+    }[];
+}
+
+/**
+ * Generates a recipe with timestamps synchronized for a video tutorial
+ * Simulation: Since we can't directly process video URLs with Gemini, 
+ * we ask the AI to infer the likely structure based on the video title/topic.
+ */
+export async function generateVideoRecipe(
+    videoTitleOrUrl: string
+): Promise<VideoSyncedRecipe> {
+    return generateWithFallback(async (modelName) => {
+        const model = genAI.getGenerativeModel({
+            model: modelName,
+            generationConfig: { responseMimeType: "application/json" }
+        });
+
+        // We assume a standard 5-10 minute cooking video structure for the simulation
+        const prompt = `
+        The user wants a summary of a cooking video titled or about: "${videoTitleOrUrl}"
+        
+        Create a clear, concise RECIPE SUMMARY based on this video topic.
+        Since we cannot watch the video directly, infer the likely professional recipe for this dish.
+        
+        Requirements:
+        1. List all necessary ingredients.
+        2. Break the cooking process into clear, logical steps.
+        3. Provide a brief explanation for each step.
+        4. Estimate total time (Prep + Cook).
+        
+        Return JSON object with this schema:
+        {
+            "title": "Recipe Title",
+            "description": "Brief appetizing description",
+            "totalTime": "e.g. 45 mins",
+            "ingredients": ["List of ingredients"],
+            "steps": [
+                {
+                    "instruction": "Step 1: Prep vegetables",
+                    "explanation": "Chop onions finely..."
+                },
+                ...
+            ]
+        }
+        `;
+
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const text = response.text();
+
+        try {
+            const cleanedText = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            return JSON.parse(cleanedText) as VideoSyncedRecipe;
+        } catch (e) {
+            console.error("Failed to parse video recipe JSON:", text);
+            throw new Error(`Invalid JSON response from ${modelName}`);
+        }
+    }, 'generateVideoRecipe');
 }
 

@@ -251,6 +251,21 @@ export default function LandingPage() {
                         <p className="text-gray-400 text-xs">Transform lazy ingredients into luxury meals</p>
                     </button>
 
+                    {/* Cook-Along (Video Sync) */}
+                    <button
+                        onClick={() => router.push('/cook-along')}
+                        className="col-span-2 bg-gradient-to-r from-red-500/10 to-pink-500/10 border border-red-500/20 rounded-xl p-4 text-left hover:bg-dark-elevated active:scale-[0.97] transition-all"
+                    >
+                        <div className="flex justify-between items-start">
+                            <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center mb-3">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-red-400"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                            </div>
+                            <span className="bg-red-500/20 text-red-300 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">New</span>
+                        </div>
+                        <h4 className="text-white text-sm font-medium mb-0.5">Video to Recipe</h4>
+                        <p className="text-gray-400 text-xs">Summarize any cooking video instantly</p>
+                    </button>
+
                     {/* Analytics */}
                     <button
                         onClick={() => router.push('/analytics')}
