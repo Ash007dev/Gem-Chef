@@ -216,6 +216,12 @@ export interface Recipe {
     };
     steps: string[];
     mealPrep: string[];
+    // Smart Prep Reminders
+    prepRequirements?: {
+        type: 'marination' | 'soaking' | 'defrosting' | 'resting' | 'chilling' | 'other';
+        description: string;
+        durationMinutes: number;
+    }[];
 }
 
 /**
@@ -498,6 +504,11 @@ export async function generateRecipes(
            - "2 medium onions (about 200g), finely diced"
            - "1 cup rice (200g) - Basmati or any long-grain rice works"
 
+        4. PREP REQUIREMENTS (IMPORTANT for Smart Reminders):
+           - If a recipe requires ADVANCE preparation (marinating, soaking, defrosting, resting dough, chilling), you MUST include it in prepRequirements
+           - Include the type, description, and duration in minutes
+           - Common examples: marinating meat (2-4 hours), soaking dal/beans (4-8 hours), thawing frozen items (30-60 min), resting dough (30-60 min), chilling desserts (2+ hours)
+
         Return JSON array with this exact schema:
         [
           {
@@ -523,9 +534,17 @@ export async function generateRecipes(
               "Step 3: Add the mustard seeds. They will start to pop and splutter within 10-15 seconds. Cover with a lid to prevent splattering. Once the popping slows down, proceed to the next step.",
               "...continue with equally detailed steps..."
             ],
-            "mealPrep": ["Can be stored in refrigerator for 3 days", "Reheat in microwave for 2 minutes"]
+            "mealPrep": ["Can be stored in refrigerator for 3 days", "Reheat in microwave for 2 minutes"],
+            "prepRequirements": [
+              {
+                "type": "marination" | "soaking" | "defrosting" | "resting" | "chilling" | "other",
+                "description": "Marinate chicken in yogurt and spices",
+                "durationMinutes": 240
+              }
+            ]
           }
         ]
+        NOTE: prepRequirements is optional - only include if the recipe requires advance preparation. Most quick recipes won't have this.
         `;
 
         const result = await model.generateContent(prompt);
