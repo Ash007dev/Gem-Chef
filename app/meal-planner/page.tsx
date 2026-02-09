@@ -111,11 +111,8 @@ function MealSelectionModal({
                 const prefs = prefsStr ? JSON.parse(prefsStr) : {};
 
                 const meals = await generateMealSuggestions(mealType, {
-                    cuisine: prefs.cuisine,
-                    dietary: prefs.diet,
-                    healthConditions: prefs.healthConditions || [],
-                    allergies: prefs.allergies || [],
-                    previousMeals: existingMeals
+                    cuisinePreference: prefs.cuisine,
+                    dietary: prefs.diet
                 });
 
                 setSuggestions(meals);
@@ -286,13 +283,13 @@ function GroceryListView({
                                         key={idx}
                                         onClick={() => toggleItem(item.name)}
                                         className={`w-full p-3 rounded-xl border transition-all flex items-center gap-3 ${checkedItems.has(item.name)
-                                                ? 'bg-dark-elevated border-dark-border opacity-50'
-                                                : 'bg-dark-card border-dark-border'
+                                            ? 'bg-dark-elevated border-dark-border opacity-50'
+                                            : 'bg-dark-card border-dark-border'
                                             }`}
                                     >
                                         <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${checkedItems.has(item.name)
-                                                ? 'bg-green-500 border-green-500'
-                                                : 'border-gray-600'
+                                            ? 'bg-green-500 border-green-500'
+                                            : 'border-gray-600'
                                             }`}>
                                             {checkedItems.has(item.name) && (
                                                 <Check className="w-4 h-4 text-white" />

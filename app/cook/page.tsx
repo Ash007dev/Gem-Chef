@@ -22,7 +22,8 @@ import {
     Sparkles,
     Loader2,
     Home,
-    Lightbulb
+    Lightbulb,
+    Package
 } from 'lucide-react';
 import {
     verifyCookingStep,
@@ -33,6 +34,7 @@ import {
     type SubstitutionResult,
     type IngredientSubstitute
 } from '@/utils/gemini';
+import { deductRecipeIngredients } from '@/utils/inventory';
 import LiveCookingOverlay from '@/components/LiveCookingOverlay';
 
 // Success Toast
@@ -267,7 +269,9 @@ function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () =>
     const fileInputRef = useRef<HTMLInputElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    // Save to cooklog (prevent duplicates - only add once per recipe per session)
+    const [deductedItems, setDeductedItems] = useState<string[]>([]);
+
+    // Save to cooklog and deduct from inventory
     useEffect(() => {
         const savedLog = localStorage.getItem('cooklog');
         const cooklog = savedLog ? JSON.parse(savedLog) : [];
@@ -279,11 +283,21 @@ function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () =>
         );
 
         if (!alreadyLogged) {
+            // Save to cooklog
             cooklog.unshift({
                 ...recipe,
                 cookedAt: new Date().toISOString()
             });
             localStorage.setItem('cooklog', JSON.stringify(cooklog.slice(0, 50)));
+
+            // Deduct ingredients from inventory
+            const allIngredients = [
+                ...(recipe.ingredients?.provided || []),
+            ];
+            if (allIngredients.length > 0) {
+                const result = deductRecipeIngredients(allIngredients);
+                setDeductedItems(result.deducted);
+            }
         }
     }, [recipe]);
 
@@ -539,7 +553,7 @@ function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () =>
                 <h2 className="text-xl font-bold text-white mb-2">
                     Well Done!
                 </h2>
-                <p className="text-gray-400 mb-6 text-sm">
+                <p className="text-gray-400 mb-4 text-sm">
                     You've completed {recipe.title}. Added to your cooklog.
                 </p>
                 <button
@@ -549,6 +563,17 @@ function CompletionModal({ recipe, onFinish }: { recipe: Recipe; onFinish: () =>
                     <Camera className="w-5 h-5" />
                     Share Your Dish
                 </button>
+                {deductedItems.length > 0 && (
+                    <div className="mb-4 p-3 bg-indigo-900/30 border border-indigo-800/50 rounded-xl">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Package className="w-4 h-4 text-indigo-400" />
+                            <span className="text-xs font-medium text-indigo-400">Inventory Updated</span>
+                        </div>
+                        <p className="text-xs text-indigo-200">
+                            Deducted {deductedItems.length} items: {deductedItems.slice(0, 3).join(', ')}{deductedItems.length > 3 ? `...` : ''}
+                        </p>
+                    </div>
+                )}
                 <button
                     onClick={onFinish}
                     className="w-full py-3 bg-dark-elevated border border-dark-border text-white rounded-xl font-medium"
