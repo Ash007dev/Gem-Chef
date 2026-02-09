@@ -16,6 +16,9 @@ import {
     Utensils,
     ImageIcon,
     TrendingUp,
+    Zap,
+    Timer,
+    CookingPot,
 } from 'lucide-react';
 
 export default function LandingPage() {
@@ -139,6 +142,37 @@ export default function LandingPage() {
                     </div>
                 </div>
             )}
+
+            {/* Quick Cook - Time Filter */}
+            <section className="mb-8 animate-fade-in">
+                <h3 className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">
+                    Quick Cook
+                </h3>
+                <p className="text-gray-400 text-sm mb-4">
+                    How much time do you have?
+                </p>
+                <div className="grid grid-cols-4 gap-2">
+                    {[
+                        { mins: 15, label: '15 min', Icon: Zap, color: 'text-yellow-400' },
+                        { mins: 30, label: '30 min', Icon: Timer, color: 'text-orange-400' },
+                        { mins: 45, label: '45 min', Icon: CookingPot, color: 'text-amber-400' },
+                        { mins: 60, label: '1 hour', Icon: ChefHat, color: 'text-red-400' },
+                    ].map((preset) => (
+                        <button
+                            key={preset.mins}
+                            onClick={() => router.push(`/scan?maxTime=${preset.mins}`)}
+                            className="bg-dark-card border border-dark-border rounded-xl p-3 text-center hover:bg-dark-elevated hover:border-orange-500/30 active:scale-[0.97] transition-all group"
+                        >
+                            <div className="flex justify-center mb-1">
+                                <preset.Icon className={`w-5 h-5 ${preset.color} group-hover:scale-110 transition-transform`} />
+                            </div>
+                            <span className="text-white text-sm font-medium">
+                                {preset.label}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            </section>
 
             {/* Feature Grid */}
             <section className="mb-8">

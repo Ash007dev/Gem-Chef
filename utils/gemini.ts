@@ -234,6 +234,8 @@ export async function generateRecipes(
         // Health profile
         healthConditions?: string[];
         allergies?: string[];
+        // Time filter (Quick Cook feature)
+        maxTime?: number | null;
     } = {}
 ): Promise<Recipe[]> {
     return generateWithFallback(async (modelName) => {
@@ -253,7 +255,8 @@ export async function generateRecipes(
             cuisine = 'Same as Location',
             ageGroup = 'Adult (20-59)',
             healthConditions = [],
-            allergies = []
+            allergies = [],
+            maxTime = null
         } = context;
 
         // Determine the cuisine to use
@@ -437,6 +440,19 @@ export async function generateRecipes(
         - Cooking for age group: ${ageGroup}
         ${ageConstraint}
         ${healthConstraint}
+        ${maxTime ? `
+        *** STRICT TIME CONSTRAINT - QUICK COOK MODE ***
+        The user has ONLY ${maxTime} MINUTES to cook. This is a hard limit.
+        ALL 9 recipes MUST have a total cooking time (prep + cook) of ${maxTime} minutes OR LESS.
+        
+        - For ${maxTime <= 15 ? 'ultra-quick recipes: Focus on no-cook, microwave, or single-pan dishes that can be ready in 15 minutes or less.' :
+                    maxTime <= 30 ? 'quick recipes: Focus on simple preparations, minimal steps, quick-cooking ingredients.' :
+                        maxTime <= 45 ? 'moderate recipes: Allow for slightly more complex preparations, but still efficient cooking methods.' :
+                            'standard recipes: Full recipes are acceptable, but avoid slow-cooking or multi-hour preparations.'}
+        
+        The "time" field in the JSON must be "${maxTime} min" or less for EVERY recipe.
+        If a dish traditionally takes longer, suggest a quick version or alternative.
+        ` : ''}
         ${effectiveCuisine ? `- Cuisine/Region: ${effectiveCuisine}` : ''}
         
         ${dietary === 'Veg' ? `*** EXTREMELY IMPORTANT DIETARY CONSTRAINT ***

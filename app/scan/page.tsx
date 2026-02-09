@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { Camera, Upload, Shuffle, MapPin, Utensils, Leaf, SlidersHorizontal, ChefHat, User } from 'lucide-react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Camera, Upload, Shuffle, MapPin, Utensils, Leaf, SlidersHorizontal, ChefHat, User, Clock } from 'lucide-react';
 import { identifyIngredients, fileToBase64 } from '@/utils/gemini';
 import PersonalizeSheet from '@/components/PersonalizeSheet';
 
@@ -13,12 +13,16 @@ type AgeGroup = 'Baby (0-2)' | 'Toddler (2-5)' | 'Kid (5-12)' | 'Teen (13-19)' |
 
 export default function ScanPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // Context state
     const [location, setLocation] = useState('Detecting...');
     const [greeting, setGreeting] = useState('');
     const [mounted, setMounted] = useState(false);
+
+    // Time filter from URL param (Quick Cook feature)
+    const [maxTime, setMaxTime] = useState<number | null>(null);
 
     // Preferences — use plain defaults for SSR, load from localStorage after mount
     const [mealTime, setMealTime] = useState<MealTime>('Lunch');
@@ -64,8 +68,14 @@ export default function ScanPage() {
             if (prefs.cookingStyle) setCookingStyle(prefs.cookingStyle);
         }
 
+        // Read maxTime from URL params (Quick Cook feature)
+        const maxTimeParam = searchParams.get('maxTime');
+        if (maxTimeParam) {
+            setMaxTime(parseInt(maxTimeParam, 10));
+        }
+
         setMounted(true);
-    }, []);
+    }, [searchParams]);
 
     // Get location (only if no saved location)
     useEffect(() => {
@@ -183,6 +193,11 @@ export default function ScanPage() {
             params.set('allergies', allergies.join(','));
         }
 
+        // Add time filter if set (Quick Cook feature)
+        if (maxTime) {
+            params.set('maxTime', maxTime.toString());
+        }
+
         router.push(`/recipes?${params.toString()}`);
     };
 
@@ -222,6 +237,21 @@ export default function ScanPage() {
                         <User className="w-3.5 h-3.5 text-gray-400" />
                         <span className="text-sm text-white">{ageGroup}</span>
                     </div>
+                    {/* Time filter indicator (Quick Cook) */}
+                    {maxTime && (
+                        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-900/30 border border-amber-700 rounded-full">
+                            <Clock className="w-3.5 h-3.5 text-amber-400" />
+                            <span className="text-sm text-amber-300">
+                                {maxTime >= 60 ? `${maxTime / 60} hour` : `${maxTime} min`}
+                            </span>
+                            <button
+                                onClick={() => setMaxTime(null)}
+                                className="ml-1 text-amber-400 hover:text-amber-200"
+                            >
+                                ×
+                            </button>
+                        </div>
+                    )}
                     <button
                         onClick={() => setShowPersonalize(true)}
                         className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-900/30 border border-indigo-800 rounded-full"
