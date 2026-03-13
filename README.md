@@ -147,3 +147,5 @@ Follow these steps to run Gem-Chef locally:
     
 ## License
 This project is for educational and portfolio purposes. All AI-generated content should be verified for safety before use.
+
+**Note:** Enjoy your smart cooking journey with Gem-Chef!
